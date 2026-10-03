@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: ADEPT API
+  description: >
+    API del backend de ADEPT — sistema de estimulación cognitiva conversacional
+    para adultos mayores, con panel de seguimiento profesional.
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:3000
+    description: Entorno local de desarrollo
+
+tags:
+  - name: Sessions
+    description: Ciclo de vida de una sesión de conversación (CU02 / CU03)
+
+paths:
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: Abrir una nueva sesión de conversación
+      description: >
+        Crea una nueva sesión para un paciente y devuelve el saludo inicial
+        generado por el agente conversacional.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenSessionRequest'
+            example:
+              patientId: pat_4471
+      responses:
+        '201':
+          description: Sesión creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSessionResponse'
+              example:
+                sessionId: sess_a93f0001
+                status: active
+                agentGreeting:
+                  text: "Hola Carlos, qué bueno verte de nuevo. ¿Cómo estuvo tu día?"
+        '404':
+          description: El paciente indicado no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sessions/{sessionId}/messages:
+    post:
+      tags: [Sessions]
+      summary: Enviar un mensaje dentro de una sesión activa
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+            example:
+              text: "Hoy me levanté con ganas de salir a caminar"
+              inputType: text
+      responses:
+        '200':
+          description: Mensaje procesado y respuesta del agente conversacional
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+              example:
+                messageId: msg_8f2a0001
+                agentReply:
+                  text: "Qué lindo plan. ¿A dónde te gusta ir a caminar?"
+                  exerciseProposed: null
+                sessionStatus: active
+        '404':
+          description: La sesión indicada no existe o no está activa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sessions/{sessionId}/exercises/{exerciseId}/responses:
+    post:
+      tags: [Sessions]
+      summary: Registrar la respuesta del usuario a un ejercicio propuesto
+      description: >
+        A diferencia de un mensaje normal, esta operación dispara además
+        una evaluación con criterio objetivo (correcto/incorrecto) que
+        queda registrada como dato propio del historial de sesión.
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: exerciseId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Identificador del ejercicio propuesto por el agente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseResponseRequest'
+            example:
+              response: "El objeto que no pertenece al grupo es la cuchara"
+      responses:
+        '200':
+          description: Evaluación del ejercicio y continuación de la conversación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExerciseResponseResult'
+              example:
+                evaluation:
+                  correct: true
+                  feedback: "¡Exacto! Las otras tres son frutas."
+                agentReply:
+                  text: "Muy bien hecho. Seguimos charlando entonces..."
+        '404':
+          description: La sesión o el ejercicio indicado no existen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sessions/{sessionId}/close:
+    post:
+      tags: [Sessions]
+      summary: Cerrar una sesión de conversación activa
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Sesión cerrada, con resumen de la conversación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloseSessionResponse'
+              example:
+                sessionId: sess_a93f0001
+                status: closed
+                summary:
+                  messageCount: 12
+                  exercisesCompleted: 2
+                  durationSeconds: 340
+        '404':
+          description: La sesión indicada no existe o ya estaba cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Identificador de la sesión de conversación
+
+  schemas:
+    OpenSessionRequest:
+      type: object
+      required: [patientId]
+      properties:
+        patientId:
+          type: string
+          example: pat_4471
+
+    OpenSessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          enum: [active]
+        agentGreeting:
+          type: object
+          properties:
+            text:
+              type: string
+
+    SendMessageRequest:
+      type: object
+      required: [text, inputType]
+      properties:
+        text:
+          type: string
+        inputType:
+          type: string
+          enum: [text, voice]
+          description: >
+            Se registra aunque la entrada por voz todavía no esté
+            implementada, para no tener que cambiar el contrato después.
+
+    SendMessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: string
+        agentReply:
+          type: object
+          properties:
+            text:
+              type: string
+            exerciseProposed:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/ExerciseSummary'
+        sessionStatus:
+          type: string
+          enum: [active, closed]
+
+    ExerciseSummary:
+      type: object
+      properties:
+        exerciseId:
+          type: string
+        type:
+          type: string
+        prompt:
+          type: string
+
+    ExerciseResponseRequest:
+      type: object
+      required: [response]
+      properties:
+        response:
+          type: string
+
+    ExerciseResponseResult:
+      type: object
+      properties:
+        evaluation:
+          type: object
+          properties:
+            correct:
+              type: boolean
+            feedback:
+              type: string
+        agentReply:
+          type: object
+          properties:
+            text:
+              type: string
+
+    CloseSessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          enum: [closed]
+        summary:
+          type: object
+          properties:
+            messageCount:
+              type: integer
+            exercisesCompleted:
+              type: integer
+            durationSeconds:
+              type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
