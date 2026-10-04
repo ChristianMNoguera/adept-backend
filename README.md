@@ -15,9 +15,10 @@ adept-backend/
 │   └── ml-service/             Servicio de Machine Learning (Python + FastAPI).
 │                               Más adelante alojará el clasificador de emociones.
 ├── contracts/
-│   └── openapi.yaml            Contrato de la API: lo que el frontend y el backend acuerdan.
+│   ├── openapi.yaml            Contrato de la API: lo que el frontend y el backend acuerdan.
+│   └── CHANGELOG.md            Qué cambió en cada versión del contrato.
 ├── infra/                      Infraestructura (AWS) — fase futura.
-├── docs/                       Documentación técnica — fase futura.
+├── docs/                       Documentación técnica (decisiones, resúmenes de sesión).
 ├── .gitignore                  Archivos que Git no debe guardar.
 └── README.md                   Este archivo.
 ```
@@ -35,8 +36,57 @@ npm run dev
 Queda escuchando en `http://localhost:3000`. Para probar: `curl http://localhost:3000/health`.
 
 Modo de datos: por defecto responde con datos mock. Para cambiarlo, copiá `.env.example`
-como `.env` y editá `DATA_SOURCE` (`mock` o `real`). Con `real`, los endpoints de
-sesiones responden `501 Not Implemented` porque la lógica real todavía no existe.
+como `.env` y editá `DATA_SOURCE` (`mock` o `real`). Con `real`, todos los endpoints
+(salvo `GET /health`) responden `501 Not Implemented` porque la lógica real todavía no existe.
+
+## API
+
+La lista completa de endpoints (24 operaciones), con sus requests, responses y roles, está en
+[`contracts/openapi.yaml`](contracts/openapi.yaml): es la fuente de verdad. Los cambios entre
+versiones están en [`contracts/CHANGELOG.md`](contracts/CHANGELOG.md).
+
+El servidor valida cada request y cada response contra ese contrato. Si un request no lo cumple
+responde `400`; si una respuesta propia lo viola responde `500` con `error: contract_violation`
+y en `message` el campo que falla (señal de que el mock quedó desalineado).
+
+### Headers de prueba (modo mock)
+
+Con `DATA_SOURCE=mock` no se valida el token de Cognito. En su lugar:
+
+| Header | Valores | Por defecto |
+|---|---|---|
+| `x-mock-role` | `patient` o `professional` | `patient` |
+| `x-mock-user-id` | cualquier texto | `pat_4471` (paciente) / `pro_0001` (profesional) |
+| `x-mock-consent` | `false` simula consentimiento no aceptado | (no se envía) |
+
+### Casos de error simulables
+
+| Qué hacer | Resultado |
+|---|---|
+| `POST /me/professionals` con `invitationCode` distinto de `ADEPT-TEST` | `404 invitation_invalid` |
+| `POST /sessions` con el header `x-mock-consent: false` | `403 consent_required` |
+| Cualquier ruta con un id de path igual a `not-found` (ej. `GET /professional/alerts/not-found`) | `404 not_found` |
+| Un rol que no corresponde a la operación (ej. paciente en `GET /professional/alerts`) | `403 forbidden` |
+
+### CORS
+
+El panel profesional corre en un navegador, así que el servidor responde CORS (incluido el
+preflight `OPTIONS`). La variable `CORS_ORIGINS` es una lista de orígenes separados por comas
+(ej. `http://localhost:5173,https://panel.ejemplo.com`). Si no se define, se permite cualquier
+origen, pero solo con `DATA_SOURCE=mock`.
+
+### Prueba de humo del contrato
+
+Con el servidor corriendo (`npm run dev`), en otra terminal:
+
+```bash
+cd services/conversational-agent
+npm run smoke
+```
+
+Recorre las 24 operaciones del contrato y muestra `ok` o `FAIL` por cada una; termina con
+código 1 si alguna falla. Usa `BASE_URL` (por defecto `http://localhost:3000`) si el servidor
+está en otra dirección.
 
 ## Cómo levantar `ml-service` en local
 
