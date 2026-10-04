@@ -1,70 +1,34 @@
-// Endpoints de sesiones de conversación.
-// Deben coincidir con lo definido en contracts/openapi.yaml.
-// Por ahora, en modo mock devuelven siempre las mismas respuestas fijas.
+// Endpoints de sesiones de conversación (CU01, CU02, CU03).
+// Deben coincidir con contracts/openapi.yaml.
 
-import { Router, Request, Response } from "express";
-import { isMockMode } from "../config/dataSource";
+import { Router } from "express";
+import { openSession, sendMessage, exerciseResult, closeSession } from "../mocks/sessions";
 
-// Un "Router" agrupa varias rutas para después montarlas todas juntas en el servidor.
 export const sessionsRouter = Router();
 
-// Respuesta que se usa cuando DATA_SOURCE=real y la lógica todavía no existe.
-function notImplemented(res: Response) {
-  return res.status(501).json({
-    error: "not_implemented",
-    message: "Lógica real pendiente de implementación",
-  });
-}
-
-// 1. Crear una nueva sesión de conversación.
-sessionsRouter.post("/sessions", (_req: Request, res: Response) => {
-  if (!isMockMode()) return notImplemented(res);
-
-  // MOCK: respuesta fija
-  res.status(201).json({
-    sessionId: "sess_mock_0001",
-    status: "active",
-    agentGreeting: { text: "Hola, qué bueno verte de nuevo. ¿Cómo estuvo tu día?" },
-  });
+// 1. Abrir una nueva sesión. El paciente sale del token, no del body.
+sessionsRouter.post("/sessions", (req, res) => {
+  // Caso simulable: con "x-mock-consent: false" el paciente no aceptó el consentimiento.
+  if (req.header("x-mock-consent") === "false") {
+    return res.status(403).json({
+      error: "consent_required",
+      message: "Tenés que aceptar el consentimiento informado para usar ADEPT",
+    });
+  }
+  res.status(201).json(openSession);
 });
 
-// 2. Enviar un mensaje del usuario dentro de una sesión.
-sessionsRouter.post("/sessions/:sessionId/messages", (_req: Request, res: Response) => {
-  if (!isMockMode()) return notImplemented(res);
-
-  // MOCK: respuesta fija
-  res.status(200).json({
-    messageId: "msg_mock_0001",
-    agentReply: {
-      text: "Qué interesante lo que contás. Contame más.",
-      exerciseProposed: null,
-    },
-    sessionStatus: "active",
-  });
+// 2. Enviar un mensaje dentro de una sesión.
+sessionsRouter.post("/sessions/:sessionId/messages", (_req, res) => {
+  res.status(200).json(sendMessage);
 });
 
 // 3. Responder un ejercicio cognitivo propuesto por el agente.
-sessionsRouter.post(
-  "/sessions/:sessionId/exercises/:exerciseId/responses",
-  (_req: Request, res: Response) => {
-    if (!isMockMode()) return notImplemented(res);
-
-    // MOCK: respuesta fija
-    res.status(200).json({
-      evaluation: { correct: true, feedback: "¡Muy bien!" },
-      agentReply: { text: "Seguimos charlando entonces..." },
-    });
-  }
-);
+sessionsRouter.post("/sessions/:sessionId/exercises/:exerciseId/responses", (_req, res) => {
+  res.status(200).json(exerciseResult);
+});
 
 // 4. Cerrar una sesión.
-sessionsRouter.post("/sessions/:sessionId/close", (_req: Request, res: Response) => {
-  if (!isMockMode()) return notImplemented(res);
-
-  // MOCK: respuesta fija
-  res.status(200).json({
-    sessionId: "sess_mock_0001",
-    status: "closed",
-    summary: { messageCount: 12, exercisesCompleted: 2, durationSeconds: 340 },
-  });
+sessionsRouter.post("/sessions/:sessionId/close", (_req, res) => {
+  res.status(200).json(closeSession);
 });
