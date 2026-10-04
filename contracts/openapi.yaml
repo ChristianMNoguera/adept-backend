@@ -1,38 +1,320 @@
 openapi: 3.0.3
 info:
   title: ADEPT API
-  description: >
-    API del backend de ADEPT — sistema de estimulación cognitiva conversacional
-    para adultos mayores, con panel de seguimiento profesional.
-  version: "0.1.0"
+  version: "0.2.0"
+  description: |
+    API del backend de ADEPT: sistema conversacional de estimulación cognitiva
+    para adultos mayores (app mobile) con panel de seguimiento para
+    profesionales de la salud (web).
+
+    **Autenticación.** El registro y el inicio de sesión los resuelve Amazon
+    Cognito directamente desde las apps (no pasan por esta API). Cada request
+    lleva un JWT de Cognito en `Authorization: Bearer <token>`. La identidad
+    (`userId`) y el rol (`patient` o `professional`) salen del token, nunca del
+    body ni de la URL.
+
+    **Modo mock (ADR-0004).** Con `DATA_SOURCE=mock` el backend no valida el
+    token y acepta estos headers de prueba: `x-mock-role` (`patient` o
+    `professional`, por defecto `patient`) y `x-mock-user-id`. Los datos que
+    devuelve son fijos y coinciden con los ejemplos de este archivo.
+
+    **Privacidad (CU04/CU05).** Si el paciente excluyó una categoría de
+    indicadores, el panel profesional la omite: la propiedad directamente no
+    aparece en la respuesta (no viene en `null` ni con aviso).
+  x-changelog: "0.2.0 - Agrega consentimiento, vinculación, privacidad, panel profesional y alertas. Cambio incompatible: POST /sessions ya no recibe patientId (sale del token)."
 
 servers:
   - url: http://localhost:3000
-    description: Entorno local de desarrollo
+    description: Desarrollo local
+
+security:
+  - bearerAuth: []
 
 tags:
+  - name: Health
+  - name: Me
+    description: Usuario autenticado y consentimiento (RF04)
+  - name: Linking
+    description: Vinculación paciente-profesional (RF03)
+  - name: Privacy
+    description: Preferencias de privacidad del paciente (CU04)
   - name: Sessions
-    description: Ciclo de vida de una sesión de conversación (CU02 / CU03)
+    description: Conversación y ejercicios (CU01, CU02, CU03)
+  - name: Professional
+    description: Panel de seguimiento (CU05)
+  - name: Alerts
+    description: Notificaciones de anomalía (CU06)
 
 paths:
-  /sessions:
-    post:
-      tags: [Sessions]
-      summary: Abrir una nueva sesión de conversación
-      description: >
-        Crea una nueva sesión para un paciente y devuelve el saludo inicial
-        generado por el agente conversacional.
+  /health:
+    get:
+      tags: [Health]
+      summary: Chequeo de salud
+      security: []
+      x-required-role: none
+      responses:
+        '200':
+          description: Servicio activo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+              example:
+                status: ok
+
+  /me:
+    get:
+      tags: [Me]
+      summary: Datos del usuario autenticado
+      x-required-role: any
+      responses:
+        '200':
+          description: Perfil básico y estado de consentimiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+              example:
+                userId: pat_4471
+                role: patient
+                username: carlos
+                email: carlos@example.com
+                consent:
+                  accepted: true
+                  version: "1.0"
+                  acceptedAt: "2026-10-05T14:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /consent/terms:
+    get:
+      tags: [Me]
+      summary: Texto vigente del consentimiento informado
+      description: El texto viaja desde el backend para poder actualizarlo sin publicar una nueva versión de la app.
+      x-required-role: patient
+      responses:
+        '200':
+          description: Versión y texto vigentes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentTerms'
+              example:
+                version: "1.0"
+                text: "ADEPT recopila indicadores de tus conversaciones para acompañar tu estimulación cognitiva..."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /me/consent:
+    get:
+      tags: [Me]
+      summary: Estado actual del consentimiento
+      x-required-role: patient
+      responses:
+        '200':
+          description: Estado del consentimiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStatus'
+              example:
+                accepted: true
+                version: "1.0"
+                acceptedAt: "2026-10-05T14:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Me]
+      summary: Aceptar o revocar el consentimiento
+      x-required-role: patient
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OpenSessionRequest'
+              $ref: '#/components/schemas/ConsentUpdate'
             example:
-              patientId: pat_4471
+              accepted: true
+              version: "1.0"
+      responses:
+        '200':
+          description: Consentimiento actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStatus'
+              example:
+                accepted: true
+                version: "1.0"
+                acceptedAt: "2026-10-05T14:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /me/professionals:
+    get:
+      tags: [Linking]
+      summary: Profesionales vinculados al paciente
+      x-required-role: patient
+      responses:
+        '200':
+          description: Lista de vínculos activos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProfessionalLink'
+              example:
+                items:
+                  - professionalId: pro_0001
+                    displayName: Dra. Laura Gómez
+                    linkedAt: "2026-10-05T15:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Linking]
+      summary: Vincularse con un profesional mediante código de invitación
+      description: Ingresar el código equivale a la aprobación explícita del paciente (RF03).
+      x-required-role: patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkRequest'
+            example:
+              invitationCode: ADEPT-TEST
       responses:
         '201':
-          description: Sesión creada exitosamente
+          description: Vínculo creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfessionalLink'
+              example:
+                professionalId: pro_0001
+                displayName: Dra. Laura Gómez
+                linkedAt: "2026-10-05T15:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El código no existe o venció
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: invitation_invalid
+                message: El código de invitación no existe o venció
+        '409':
+          description: El paciente ya está vinculado con ese profesional
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: already_linked
+                message: Ya estás vinculado con este profesional
+
+  /me/professionals/{professionalId}:
+    delete:
+      tags: [Linking]
+      summary: Desvincular a un profesional
+      description: El profesional pierde de inmediato el acceso a los datos del paciente.
+      x-required-role: patient
+      parameters:
+        - $ref: '#/components/parameters/ProfessionalId'
+      responses:
+        '204':
+          description: Vínculo eliminado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /me/privacy:
+    get:
+      tags: [Privacy]
+      summary: Preferencias de privacidad vigentes
+      x-required-role: patient
+      responses:
+        '200':
+          description: Categorías compartidas con el profesional
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivacyPreferences'
+              example:
+                linguisticIndicators: true
+                emotionalState: true
+                anomalySignals: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Privacy]
+      summary: Actualizar preferencias de privacidad
+      description: Se aplican a partir de la próxima sesión procesada.
+      x-required-role: patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrivacyPreferences'
+            example:
+              linguisticIndicators: true
+              emotionalState: false
+              anomalySignals: true
+      responses:
+        '200':
+          description: Preferencias guardadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivacyPreferences'
+              example:
+                linguisticIndicators: true
+                emotionalState: false
+                anomalySignals: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: Abrir una nueva sesión de conversación
+      description: >
+        El paciente se identifica por el token. Si no aceptó el consentimiento
+        vigente, responde 403 con `error: consent_required`.
+      x-required-role: patient
+      responses:
+        '201':
+          description: Sesión creada, con el saludo inicial del agente
           content:
             application/json:
               schema:
@@ -42,17 +324,16 @@ paths:
                 status: active
                 agentGreeting:
                   text: "Hola Carlos, qué bueno verte de nuevo. ¿Cómo estuvo tu día?"
-        '404':
-          description: El paciente indicado no existe
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /sessions/{sessionId}/messages:
     post:
       tags: [Sessions]
       summary: Enviar un mensaje dentro de una sesión activa
+      x-required-role: patient
       parameters:
         - $ref: '#/components/parameters/SessionId'
       requestBody:
@@ -66,7 +347,7 @@ paths:
               inputType: text
       responses:
         '200':
-          description: Mensaje procesado y respuesta del agente conversacional
+          description: Respuesta del agente conversacional
           content:
             application/json:
               schema:
@@ -77,29 +358,24 @@ paths:
                   text: "Qué lindo plan. ¿A dónde te gusta ir a caminar?"
                   exerciseProposed: null
                 sessionStatus: active
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: La sesión indicada no existe o no está activa
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/NotFound'
 
   /sessions/{sessionId}/exercises/{exerciseId}/responses:
     post:
       tags: [Sessions]
       summary: Registrar la respuesta del usuario a un ejercicio propuesto
       description: >
-        A diferencia de un mensaje normal, esta operación dispara además
-        una evaluación con criterio objetivo (correcto/incorrecto) que
-        queda registrada como dato propio del historial de sesión.
+        A diferencia de un mensaje normal, dispara una evaluación objetiva
+        (correcto/incorrecto) que queda registrada como dato propio de la sesión.
+      x-required-role: patient
       parameters:
         - $ref: '#/components/parameters/SessionId'
-        - name: exerciseId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Identificador del ejercicio propuesto por el agente
+        - $ref: '#/components/parameters/ExerciseId'
       requestBody:
         required: true
         content:
@@ -110,7 +386,7 @@ paths:
               response: "El objeto que no pertenece al grupo es la cuchara"
       responses:
         '200':
-          description: Evaluación del ejercicio y continuación de la conversación
+          description: Evaluación y continuación de la conversación
           content:
             application/json:
               schema:
@@ -121,22 +397,24 @@ paths:
                   feedback: "¡Exacto! Las otras tres son frutas."
                 agentReply:
                   text: "Muy bien hecho. Seguimos charlando entonces..."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: La sesión o el ejercicio indicado no existen
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/NotFound'
 
   /sessions/{sessionId}/close:
     post:
       tags: [Sessions]
-      summary: Cerrar una sesión de conversación activa
+      summary: Cerrar una sesión activa
+      description: Al cerrar, la sesión se encola para su procesamiento posterior (NLP/ML), de forma independiente de la conversación.
+      x-required-role: patient
       parameters:
         - $ref: '#/components/parameters/SessionId'
       responses:
         '200':
-          description: Sesión cerrada, con resumen de la conversación
+          description: Sesión cerrada, con resumen
           content:
             application/json:
               schema:
@@ -148,14 +426,370 @@ paths:
                   messageCount: 12
                   exercisesCompleted: 2
                   durationSeconds: 340
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: La sesión indicada no existe o ya estaba cerrada
+          $ref: '#/components/responses/NotFound'
+
+  /professional/invitations:
+    post:
+      tags: [Professional]
+      summary: Generar un código de invitación para vincular a un paciente
+      x-required-role: professional
+      responses:
+        '201':
+          description: Código generado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/InvitationResponse'
+              example:
+                code: ADEPT-TEST
+                expiresAt: "2026-10-12T15:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /professional/patients:
+    get:
+      tags: [Professional]
+      summary: Pacientes vinculados al profesional
+      x-required-role: professional
+      responses:
+        '200':
+          description: Lista de pacientes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PatientSummary'
+              example:
+                items:
+                  - patientId: pat_4471
+                    displayName: Carlos Pérez
+                    lastSessionAt: "2026-10-05T14:40:00Z"
+                    sessionsProcessed: 12
+                    openAlerts: 1
+                    latestEmotion: neutral
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /professional/patients/{patientId}:
+    get:
+      tags: [Professional]
+      summary: Datos personales del paciente
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+      responses:
+        '200':
+          description: Datos personales
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProfile'
+              example:
+                patientId: pat_4471
+                fullName: Carlos Pérez
+                birthDate: "1948-03-14"
+                phone: "+54 11 5555-0101"
+                notes: "Prefiere sesiones por la mañana."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Professional]
+      summary: Actualizar datos personales del paciente
+      description: Configuración de paciente a nivel individual. No incluye parámetros de detección (ADR-0007).
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientProfileUpdate'
+            example:
+              phone: "+54 11 5555-0101"
+              notes: "Prefiere sesiones por la mañana."
+      responses:
+        '200':
+          description: Datos actualizados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProfile'
+              example:
+                patientId: pat_4471
+                fullName: Carlos Pérez
+                birthDate: "1948-03-14"
+                phone: "+54 11 5555-0101"
+                notes: "Prefiere sesiones por la mañana."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /professional/patients/{patientId}/dashboard:
+    get:
+      tags: [Professional]
+      summary: Dashboard de evolución del paciente
+      description: Si no hay sesiones procesadas en el período, devuelve el estado vacío (ceros y sin bloques de indicadores), sin generar alertas.
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Resumen del período
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+              example:
+                patientId: pat_4471
+                period:
+                  from: "2026-09-05"
+                  to: "2026-10-05"
+                sessionsProcessed: 12
+                usage:
+                  sessionsInPeriod: 12
+                  activeDays: 10
+                  lastSessionAt: "2026-10-05T14:40:00Z"
+                linguisticIndicators:
+                  ttrLatest: 0.52
+                  ttrBaseline: 0.58
+                  variationPct: -10.3
+                emotionalState:
+                  latestLabel: neutral
+                  distribution:
+                    positive_active: 4
+                    neutral: 6
+                    withdrawn_sad: 2
+                    anxious: 0
+                anomalySignals:
+                  openAlerts: 1
+                  lastDetectedAt: "2026-10-05T14:45:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /professional/patients/{patientId}/history:
+    get:
+      tags: [Professional]
+      summary: Evolución histórica por sesión
+      description: Un punto por sesión procesada. Las propiedades de categorías excluidas por el paciente no aparecen.
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: indicator
+          in: query
+          required: false
+          description: Limita la respuesta a un tipo de indicador.
+          schema:
+            type: string
+            enum: [linguistic, emotional, anomaly, usage]
+      responses:
+        '200':
+          description: Serie de sesiones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+              example:
+                patientId: pat_4471
+                points:
+                  - sessionId: sess_a93f0001
+                    startedAt: "2026-10-05T14:30:00Z"
+                    ttr: 0.52
+                    emotionLabel: neutral
+                    anomalyScore: 0.71
+                    durationSeconds: 340
+                    messageCount: 12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /professional/patients/{patientId}/sessions/{sessionId}/indicators:
+    get:
+      tags: [Professional]
+      summary: Detalle de variación de una sesión frente a la línea de base
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Indicadores de la sesión comparados con la línea de base del paciente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionIndicatorsResponse'
+              example:
+                sessionId: sess_a93f0001
+                startedAt: "2026-10-05T14:30:00Z"
+                indicators:
+                  - key: ttr
+                    label: Diversidad léxica (TTR)
+                    value: 0.52
+                    baselineMean: 0.58
+                    deviationPct: -10.3
+                    isOutlier: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /professional/alerts:
+    get:
+      tags: [Alerts]
+      summary: Centro de alertas
+      x-required-role: professional
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, reviewed]
+        - name: patientId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alertas del profesional
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AlertSummary'
+              example:
+                items:
+                  - alertId: alert_0001
+                    patientId: pat_4471
+                    patientDisplayName: Carlos Pérez
+                    sessionId: sess_a93f0001
+                    detectedAt: "2026-10-05T14:45:00Z"
+                    status: pending
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /professional/alerts/{alertId}:
+    get:
+      tags: [Alerts]
+      summary: Detalle de una alerta
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Sesión, indicadores afectados y comparación con la línea de base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetail'
+              example:
+                alertId: alert_0001
+                patientId: pat_4471
+                patientDisplayName: Carlos Pérez
+                sessionId: sess_a93f0001
+                detectedAt: "2026-10-05T14:45:00Z"
+                status: pending
+                reviewedAt: null
+                affectedIndicators:
+                  - key: ttr
+                    label: Diversidad léxica (TTR)
+                    value: 0.41
+                    baselineMean: 0.58
+                    deviationPct: -29.3
+                    isOutlier: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /professional/alerts/{alertId}/review:
+    post:
+      tags: [Alerts]
+      summary: Marcar una alerta como revisada
+      x-required-role: professional
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Alerta archivada en el historial de eventos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetail'
+              example:
+                alertId: alert_0001
+                patientId: pat_4471
+                patientDisplayName: Carlos Pérez
+                sessionId: sess_a93f0001
+                detectedAt: "2026-10-05T14:45:00Z"
+                status: reviewed
+                reviewedAt: "2026-10-06T09:10:00Z"
+                affectedIndicators:
+                  - key: ttr
+                    label: Diversidad léxica (TTR)
+                    value: 0.41
+                    baselineMean: 0.58
+                    deviationPct: -29.3
+                    isOutlier: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Amazon Cognito. El rol viaja en el grupo del usuario.
+
   parameters:
     SessionId:
       name: sessionId
@@ -163,19 +797,183 @@ components:
       required: true
       schema:
         type: string
-      description: Identificador de la sesión de conversación
+      description: Identificador de la sesión
+    ExerciseId:
+      name: exerciseId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Identificador del ejercicio propuesto por el agente
+    PatientId:
+      name: patientId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Identificador del paciente (debe estar vinculado al profesional autenticado)
+    ProfessionalId:
+      name: professionalId
+      in: path
+      required: true
+      schema:
+        type: string
+    AlertId:
+      name: alertId
+      in: path
+      required: true
+      schema:
+        type: string
+    From:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+      description: Inicio del período (YYYY-MM-DD)
+    To:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+      description: Fin del período (YYYY-MM-DD)
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido o vencido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: unauthorized
+            message: Token ausente o inválido
+    Forbidden:
+      description: >
+        El rol no tiene permiso para esta operación, el recurso no pertenece al
+        usuario, o (en POST /sessions) falta aceptar el consentimiento
+        (`error: consent_required`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: forbidden
+            message: No tenés permiso para esta operación
+    NotFound:
+      description: El recurso no existe, o existe pero el usuario no puede verlo
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: not_found
+            message: Recurso no encontrado
 
   schemas:
-    OpenSessionRequest:
+    Error:
       type: object
-      required: [patientId]
+      required: [error, message]
       properties:
-        patientId:
+        error:
           type: string
-          example: pat_4471
+          description: Código estable legible por máquina
+        message:
+          type: string
+          description: Texto para mostrar o registrar
+
+    Role:
+      type: string
+      enum: [patient, professional]
+
+    EmotionLabel:
+      type: string
+      description: Etiqueta emocional de ADEPT (resultado de la capa de traducción sobre BETO).
+      enum: [positive_active, neutral, withdrawn_sad, anxious]
+
+    MeResponse:
+      type: object
+      required: [userId, role, username, email]
+      properties:
+        userId:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        consent:
+          $ref: '#/components/schemas/ConsentStatus'
+
+    ConsentTerms:
+      type: object
+      required: [version, text]
+      properties:
+        version:
+          type: string
+        text:
+          type: string
+
+    ConsentStatus:
+      type: object
+      required: [accepted, version]
+      properties:
+        accepted:
+          type: boolean
+        version:
+          type: string
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ConsentUpdate:
+      type: object
+      required: [accepted, version]
+      properties:
+        accepted:
+          type: boolean
+        version:
+          type: string
+
+    ProfessionalLink:
+      type: object
+      required: [professionalId, displayName, linkedAt]
+      properties:
+        professionalId:
+          type: string
+        displayName:
+          type: string
+        linkedAt:
+          type: string
+          format: date-time
+
+    LinkRequest:
+      type: object
+      required: [invitationCode]
+      properties:
+        invitationCode:
+          type: string
+
+    PrivacyPreferences:
+      type: object
+      required: [linguisticIndicators, emotionalState, anomalySignals]
+      properties:
+        linguisticIndicators:
+          type: boolean
+        emotionalState:
+          type: boolean
+        anomalySignals:
+          type: boolean
 
     OpenSessionResponse:
       type: object
+      required: [sessionId, status, agentGreeting]
       properties:
         sessionId:
           type: string
@@ -184,6 +982,7 @@ components:
           enum: [active]
         agentGreeting:
           type: object
+          required: [text]
           properties:
             text:
               type: string
@@ -197,30 +996,13 @@ components:
         inputType:
           type: string
           enum: [text, voice]
-          description: >
-            Se registra aunque la entrada por voz todavía no esté
-            implementada, para no tener que cambiar el contrato después.
-
-    SendMessageResponse:
-      type: object
-      properties:
-        messageId:
-          type: string
-        agentReply:
-          type: object
-          properties:
-            text:
-              type: string
-            exerciseProposed:
-              nullable: true
-              allOf:
-                - $ref: '#/components/schemas/ExerciseSummary'
-        sessionStatus:
-          type: string
-          enum: [active, closed]
+          description: Se registra aunque la voz todavía no esté implementada, para no cambiar el contrato después.
 
     ExerciseSummary:
       type: object
+      nullable: true
+      description: Ejercicio propuesto en este turno, o null si no corresponde proponer uno.
+      required: [exerciseId, type, prompt]
       properties:
         exerciseId:
           type: string
@@ -228,6 +1010,24 @@ components:
           type: string
         prompt:
           type: string
+
+    SendMessageResponse:
+      type: object
+      required: [messageId, agentReply, sessionStatus]
+      properties:
+        messageId:
+          type: string
+        agentReply:
+          type: object
+          required: [text, exerciseProposed]
+          properties:
+            text:
+              type: string
+            exerciseProposed:
+              $ref: '#/components/schemas/ExerciseSummary'
+        sessionStatus:
+          type: string
+          enum: [active, closed]
 
     ExerciseResponseRequest:
       type: object
@@ -238,9 +1038,11 @@ components:
 
     ExerciseResponseResult:
       type: object
+      required: [evaluation, agentReply]
       properties:
         evaluation:
           type: object
+          required: [correct, feedback]
           properties:
             correct:
               type: boolean
@@ -248,12 +1050,14 @@ components:
               type: string
         agentReply:
           type: object
+          required: [text]
           properties:
             text:
               type: string
 
     CloseSessionResponse:
       type: object
+      required: [sessionId, status, summary]
       properties:
         sessionId:
           type: string
@@ -262,6 +1066,7 @@ components:
           enum: [closed]
         summary:
           type: object
+          required: [messageCount, exercisesCompleted, durationSeconds]
           properties:
             messageCount:
               type: integer
@@ -270,10 +1075,228 @@ components:
             durationSeconds:
               type: integer
 
-    ErrorResponse:
+    InvitationResponse:
       type: object
+      required: [code, expiresAt]
       properties:
-        error:
+        code:
           type: string
-        message:
+        expiresAt:
           type: string
+          format: date-time
+
+    PatientSummary:
+      type: object
+      required: [patientId, displayName, sessionsProcessed, openAlerts]
+      properties:
+        patientId:
+          type: string
+        displayName:
+          type: string
+        lastSessionAt:
+          type: string
+          format: date-time
+          nullable: true
+        sessionsProcessed:
+          type: integer
+        openAlerts:
+          type: integer
+        latestEmotion:
+          $ref: '#/components/schemas/EmotionLabel'
+
+    PatientProfile:
+      type: object
+      required: [patientId, fullName]
+      properties:
+        patientId:
+          type: string
+        fullName:
+          type: string
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+          description: Notas del profesional sobre el paciente
+
+    PatientProfileUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        fullName:
+          type: string
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    DashboardResponse:
+      type: object
+      required: [patientId, period, sessionsProcessed, usage]
+      properties:
+        patientId:
+          type: string
+        period:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        sessionsProcessed:
+          type: integer
+        usage:
+          type: object
+          required: [sessionsInPeriod, activeDays]
+          properties:
+            sessionsInPeriod:
+              type: integer
+            activeDays:
+              type: integer
+            lastSessionAt:
+              type: string
+              format: date-time
+              nullable: true
+        linguisticIndicators:
+          type: object
+          description: Omitido si el paciente excluyó esta categoría.
+          required: [ttrLatest, ttrBaseline, variationPct]
+          properties:
+            ttrLatest:
+              type: number
+            ttrBaseline:
+              type: number
+            variationPct:
+              type: number
+        emotionalState:
+          type: object
+          description: Omitido si el paciente excluyó esta categoría.
+          required: [latestLabel, distribution]
+          properties:
+            latestLabel:
+              $ref: '#/components/schemas/EmotionLabel'
+            distribution:
+              type: object
+              additionalProperties:
+                type: integer
+        anomalySignals:
+          type: object
+          description: Omitido si el paciente excluyó esta categoría.
+          required: [openAlerts]
+          properties:
+            openAlerts:
+              type: integer
+            lastDetectedAt:
+              type: string
+              format: date-time
+              nullable: true
+
+    HistoryResponse:
+      type: object
+      required: [patientId, points]
+      properties:
+        patientId:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionPoint'
+
+    SessionPoint:
+      type: object
+      required: [sessionId, startedAt]
+      properties:
+        sessionId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        ttr:
+          type: number
+        emotionLabel:
+          $ref: '#/components/schemas/EmotionLabel'
+        anomalyScore:
+          type: number
+        durationSeconds:
+          type: integer
+        messageCount:
+          type: integer
+
+    IndicatorComparison:
+      type: object
+      required: [key, label, value, baselineMean, deviationPct]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: number
+        baselineMean:
+          type: number
+        deviationPct:
+          type: number
+        isOutlier:
+          type: boolean
+
+    SessionIndicatorsResponse:
+      type: object
+      required: [sessionId, startedAt, indicators]
+      properties:
+        sessionId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        indicators:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndicatorComparison'
+
+    AlertSummary:
+      type: object
+      required: [alertId, patientId, patientDisplayName, sessionId, detectedAt, status]
+      properties:
+        alertId:
+          type: string
+        patientId:
+          type: string
+        patientDisplayName:
+          type: string
+        sessionId:
+          type: string
+        detectedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, reviewed]
+
+    AlertDetail:
+      allOf:
+        - $ref: '#/components/schemas/AlertSummary'
+        - type: object
+          required: [affectedIndicators]
+          properties:
+            reviewedAt:
+              type: string
+              format: date-time
+              nullable: true
+            affectedIndicators:
+              type: array
+              items:
+                $ref: '#/components/schemas/IndicatorComparison'
