@@ -1,3 +1,4 @@
-# docs
+# Documentación de ADEPT
 
-Placeholder. Acá va a ir la documentación técnica del backend en una fase futura.
+- [`decisions/`](decisions/README.md) — registro de decisiones de arquitectura (ADR),
+  una por archivo, con su contexto y alternativas consideradas.
