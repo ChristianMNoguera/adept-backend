@@ -1,2 +1,8 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+# Carga y ejecuta el modelo de emociones (versión con la que se entrenó y guardó).
+transformers==4.57.6
+# Motor numérico que usa transformers (versión CPU; alcanza para el servicio).
+torch==2.14.1
+# La usa app/preprocessing.py para convertir emojis en texto; sin ella el servicio falla.
+emoji==2.16.0
