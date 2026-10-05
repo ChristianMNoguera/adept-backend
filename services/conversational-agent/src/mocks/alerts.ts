@@ -14,9 +14,9 @@ const affectedIndicators = [
     key: "ttr",
     label: "Diversidad léxica (TTR)",
     value: 0.41,
-    baselineMean: 0.58,
-    deviationPct: -29.3,
-    isOutlier: true,
+    personalMedian: 0.58,
+    robustDistance: 3.1,
+    affected: true,
   },
 ];
 

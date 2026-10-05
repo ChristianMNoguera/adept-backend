@@ -4,7 +4,7 @@
 export const openSession = {
   sessionId: "sess_a93f0001",
   status: "active",
-  agentGreeting: { text: "Hola Carlos, qué bueno verte de nuevo. ¿Cómo estuvo tu día?" },
+  agentGreeting: { text: "Hola, qué bueno verte de nuevo. ¿Cómo estuvo tu día?" },
 };
 
 export const sendMessage = {
