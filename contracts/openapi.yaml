@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ADEPT API
-  version: "0.2.1"
+  version: "0.3.0"
   description: |
     API del backend de ADEPT: sistema conversacional de estimulación cognitiva
     para adultos mayores (app mobile) con panel de seguimiento para
@@ -25,6 +25,25 @@ info:
     **Privacidad (CU04/CU05).** Si el paciente excluyó una categoría de
     indicadores, el panel profesional la omite: la propiedad directamente no
     aparece en la respuesta (no viene en `null` ni con aviso).
+
+    **Cierre de sesión y procesamiento (RNF07, RNF09).** El texto de la
+    conversación se conserva solo mientras la sesión está activa. Una sesión
+    se cierra por pedido del usuario (`POST /sessions/{sessionId}/close`) o
+    por inactividad prolongada. Al cerrarse se encola una única tarea de
+    procesamiento por lotes, que calcula los indicadores, clasifica la emoción
+    y descarta el texto. La respuesta de la conversación nunca espera a ese
+    procesamiento.
+
+    **Categorías emocionales (RF10).** Son las siete del corpus EmoEvent_es:
+    `anger`, `disgust`, `fear`, `joy`, `sadness`, `surprise` y `others`. La
+    etiqueta de una sesión es la de mayor probabilidad media entre las
+    intervenciones del usuario.
+
+    **Cambio de un indicador (MAD).** Para cada indicador se informa la
+    distancia robusta respecto de la mediana personal, expresada en
+    desviaciones absolutas medianas (`robustDistance`). Un indicador queda
+    marcado como afectado (`affected`) cuando esa distancia es 2,5 o más. La
+    marca no genera una alerta por sí sola.
 
 servers:
   - url: http://localhost:3000
@@ -93,6 +112,33 @@ paths:
                   acceptedAt: "2026-10-05T14:30:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Me]
+      summary: Eliminar la cuenta del usuario (CU07)
+      description: >
+        Suprime los datos personales, las vinculaciones, las métricas derivadas
+        y los metadatos de sesión del usuario, y elimina su identidad en el
+        servicio de autenticación (RF20). Es irreversible. La confirmación
+        explícita se pide en la app y, como resguardo, el backend exige
+        `confirm=true`. El historial local del dispositivo lo borra la app.
+      x-required-role: patient
+      parameters:
+        - name: confirm
+          in: query
+          required: true
+          description: Debe ser `true`. Evita borrados por un pedido accidental.
+          schema:
+            type: boolean
+            enum: [true]
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '204':
+          description: Cuenta eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /consent/terms:
     get:
@@ -321,7 +367,9 @@ paths:
       summary: Abrir una nueva sesión de conversación
       description: >
         El paciente se identifica por el token. Si no aceptó el consentimiento
-        vigente, responde 403 con `error: consent_required`.
+        vigente, responde 403 con `error: consent_required`. El saludo no
+        incluye datos personales: la aplicación puede personalizarlo
+        localmente (RNF12).
       x-required-role: patient
       responses:
         '201':
@@ -334,7 +382,7 @@ paths:
                 sessionId: sess_a93f0001
                 status: active
                 agentGreeting:
-                  text: "Hola Carlos, qué bueno verte de nuevo. ¿Cómo estuvo tu día?"
+                  text: "Hola, qué bueno verte de nuevo. ¿Cómo estuvo tu día?"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -510,7 +558,7 @@ paths:
                     lastSessionAt: "2026-10-05T14:40:00Z"
                     sessionsProcessed: 12
                     openAlerts: 1
-                    latestEmotion: neutral
+                    latestEmotion: others
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -612,16 +660,41 @@ paths:
                   activeDays: 10
                   lastSessionAt: "2026-10-05T14:40:00Z"
                 linguisticIndicators:
-                  ttrLatest: 0.52
-                  ttrBaseline: 0.58
-                  variationPct: -10.3
+                  indicators:
+                    - key: ttr
+                      label: Diversidad léxica (TTR)
+                      value: 0.52
+                      personalMedian: 0.58
+                      robustDistance: 1.4
+                      affected: false
+                    - key: avg_length_words
+                      label: Longitud promedio de respuesta (palabras)
+                      value: 14.2
+                      personalMedian: 16.0
+                      robustDistance: 0.9
+                      affected: false
+                    - key: avg_response_seconds
+                      label: Tiempo promedio de respuesta (segundos)
+                      value: 6.8
+                      personalMedian: 5.1
+                      robustDistance: 1.1
+                      affected: false
+                    - key: coherence
+                      label: Coherencia discursiva
+                      value: 0.61
+                      personalMedian: 0.66
+                      robustDistance: 0.7
+                      affected: false
                 emotionalState:
-                  latestLabel: neutral
+                  latestLabel: others
                   distribution:
-                    positive_active: 4
-                    neutral: 6
-                    withdrawn_sad: 2
-                    anxious: 0
+                    joy: 4
+                    others: 5
+                    sadness: 2
+                    anger: 1
+                    fear: 0
+                    disgust: 0
+                    surprise: 0
                 anomalySignals:
                   openAlerts: 1
                   lastDetectedAt: "2026-10-05T14:45:00Z"
@@ -664,7 +737,10 @@ paths:
                   - sessionId: sess_a93f0001
                     startedAt: "2026-10-05T14:30:00Z"
                     ttr: 0.52
-                    emotionLabel: neutral
+                    avgLengthWords: 14.2
+                    avgResponseSeconds: 6.8
+                    coherence: 0.61
+                    emotionLabel: others
                     anomalyScore: 0.71
                     durationSeconds: 340
                     messageCount: 12
@@ -699,9 +775,9 @@ paths:
                   - key: ttr
                     label: Diversidad léxica (TTR)
                     value: 0.52
-                    baselineMean: 0.58
-                    deviationPct: -10.3
-                    isOutlier: false
+                    personalMedian: 0.58
+                    robustDistance: 1.4
+                    affected: false
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -782,9 +858,9 @@ paths:
                   - key: ttr
                     label: Diversidad léxica (TTR)
                     value: 0.41
-                    baselineMean: 0.58
-                    deviationPct: -29.3
-                    isOutlier: true
+                    personalMedian: 0.58
+                    robustDistance: 3.1
+                    affected: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -820,9 +896,9 @@ paths:
                   - key: ttr
                     label: Diversidad léxica (TTR)
                     value: 0.41
-                    baselineMean: 0.58
-                    deviationPct: -29.3
-                    isOutlier: true
+                    personalMedian: 0.58
+                    robustDistance: 3.1
+                    affected: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -948,8 +1024,8 @@ components:
 
     EmotionLabel:
       type: string
-      description: Etiqueta emocional de ADEPT (resultado de la capa de traducción sobre BETO).
-      enum: [positive_active, neutral, withdrawn_sad, anxious]
+      description: Categoría emocional del corpus EmoEvent_es (RF10). La etiqueta de una sesión es la de mayor probabilidad media entre las intervenciones del usuario.
+      enum: [anger, disgust, fear, joy, sadness, surprise, others]
 
     MeResponse:
       type: object
@@ -1231,14 +1307,12 @@ components:
         linguisticIndicators:
           type: object
           description: Omitido si el paciente excluyó esta categoría.
-          required: [ttrLatest, ttrBaseline, variationPct]
+          required: [indicators]
           properties:
-            ttrLatest:
-              type: number
-            ttrBaseline:
-              type: number
-            variationPct:
-              type: number
+            indicators:
+              type: array
+              items:
+                $ref: '#/components/schemas/IndicatorComparison'
         emotionalState:
           type: object
           description: Omitido si el paciente excluyó esta categoría.
@@ -1284,6 +1358,12 @@ components:
           format: date-time
         ttr:
           type: number
+        avgLengthWords:
+          type: number
+        avgResponseSeconds:
+          type: number
+        coherence:
+          type: number
         emotionLabel:
           $ref: '#/components/schemas/EmotionLabel'
         anomalyScore:
@@ -1295,19 +1375,26 @@ components:
 
     IndicatorComparison:
       type: object
-      required: [key, label, value, baselineMean, deviationPct]
+      description: >
+        Valor de un indicador en una sesión comparado con la mediana personal
+        del paciente. `robustDistance` es la distancia a esa mediana en
+        desviaciones absolutas medianas (MAD); `affected` es verdadero cuando
+        es 2,5 o más. La marca no genera una alerta por sí sola.
+      required: [key, label, value, personalMedian, robustDistance, affected]
       properties:
         key:
           type: string
+          description: ttr, avg_length_words, avg_response_seconds, coherence, exercise_score o emotion_code
         label:
           type: string
         value:
           type: number
-        baselineMean:
+        personalMedian:
           type: number
-        deviationPct:
+        robustDistance:
           type: number
-        isOutlier:
+          minimum: 0
+        affected:
           type: boolean
 
     SessionIndicatorsResponse:

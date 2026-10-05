@@ -1,7 +1,7 @@
 # ADR-0007: Umbral de Isolation Forest gestionado fuera de la aplicación
 
-- **Fecha:** 2026-29-30
-- **Estado:** Aceptada
+- **Fecha:** 2026-99-29
+- **Estado:** Reemplazada por ADR-0009
 - **Nota de implementación:** esta pieza todavía no está construida —
   corresponde a la fase de desarrollo del Isolation Forest.
 

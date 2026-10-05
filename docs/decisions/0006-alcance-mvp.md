@@ -1,7 +1,7 @@
 # ADR-0006: Alcance del MVP del backend
 
-- **Fecha:** 2026-09-20
-- **Estado:** Aceptada
+- **Fecha:** 2026-09-23
+- **Estado:** Reemplazada por ADR-0008
 
 ## Contexto
 
