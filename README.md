@@ -104,6 +104,18 @@ uvicorn app.main:app --reload
 
 Queda escuchando en `http://localhost:8000`. Para probar: `curl http://localhost:8000/health`.
 
+**Modelo de emociones.** El modelo entrenado se coloca en `services/ml-service/models/beto-emoevent/`
+(esa carpeta no va a git porque pesa cientos de MB). Para comprobar que, cargado en tu máquina, da
+los mismos resultados que en Colab, corré desde `services/ml-service`:
+
+```bash
+python scripts/check_model.py
+```
+
+Las versiones de `requirements.txt` están fijas a propósito: el modelo se entrenó con
+`transformers` 4.57.6, y usar otra versión puede cambiar su comportamiento. Todavía no hay
+ningún endpoint que use el clasificador; por ahora solo se verifica con ese script.
+
 ## Qué NO está implementado todavía
 
 Todo esto se va a ir agregando en etapas siguientes, de a una por vez:
