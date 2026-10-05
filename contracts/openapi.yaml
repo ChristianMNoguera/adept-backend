@@ -1,11 +1,15 @@
 openapi: 3.0.3
 info:
   title: ADEPT API
-  version: "0.2.0"
+  version: "0.2.1"
   description: |
     API del backend de ADEPT: sistema conversacional de estimulación cognitiva
     para adultos mayores (app mobile) con panel de seguimiento para
     profesionales de la salud (web).
+
+    **Contrato primero (ADR-0003).** Este archivo es la fuente de verdad entre
+    backend y frontend. Un desvío del código respecto de este contrato es un
+    error a corregir. Todo cambio de forma se define primero acá.
 
     **Autenticación.** El registro y el inicio de sesión los resuelve Amazon
     Cognito directamente desde las apps (no pasan por esta API). Cada request
@@ -21,7 +25,6 @@ info:
     **Privacidad (CU04/CU05).** Si el paciente excluyó una categoría de
     indicadores, el panel profesional la omite: la propiedad directamente no
     aparece en la respuesta (no viene en `null` ni con aviso).
-  x-changelog: "0.2.0 - Agrega consentimiento, vinculación, privacidad, panel profesional y alertas. Cambio incompatible: POST /sessions ya no recibe patientId (sale del token)."
 
 servers:
   - url: http://localhost:3000
@@ -146,6 +149,8 @@ paths:
               accepted: true
               version: "1.0"
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Consentimiento actualizado
           content:
@@ -202,6 +207,8 @@ paths:
             example:
               invitationCode: ADEPT-TEST
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '201':
           description: Vínculo creado
           content:
@@ -244,6 +251,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProfessionalId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '204':
           description: Vínculo eliminado
         '401':
@@ -289,6 +298,8 @@ paths:
               emotionalState: false
               anomalySignals: true
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Preferencias guardadas
           content:
@@ -327,7 +338,22 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: "Rol incorrecto (código forbidden) o consentimiento pendiente (código consent_required)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                consentRequired:
+                  summary: Falta aceptar el consentimiento vigente
+                  value:
+                    error: consent_required
+                    message: Tenés que aceptar el consentimiento antes de conversar
+                forbidden:
+                  summary: El rol no corresponde
+                  value:
+                    error: forbidden
+                    message: No tenés permiso para esta operación
 
   /sessions/{sessionId}/messages:
     post:
@@ -346,6 +372,8 @@ paths:
               text: "Hoy me levanté con ganas de salir a caminar"
               inputType: text
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Respuesta del agente conversacional
           content:
@@ -385,6 +413,8 @@ paths:
             example:
               response: "El objeto que no pertenece al grupo es la cuchara"
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Evaluación y continuación de la conversación
           content:
@@ -413,6 +443,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/SessionId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Sesión cerrada, con resumen
           content:
@@ -492,6 +524,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PatientId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Datos personales
           content:
@@ -527,6 +561,8 @@ paths:
               phone: "+54 11 5555-0101"
               notes: "Prefiere sesiones por la mañana."
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Datos actualizados
           content:
@@ -557,6 +593,8 @@ paths:
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Resumen del período
           content:
@@ -612,6 +650,8 @@ paths:
             type: string
             enum: [linguistic, emotional, anomaly, usage]
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Serie de sesiones
           content:
@@ -644,6 +684,8 @@ paths:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/SessionId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Indicadores de la sesión comparados con la línea de base del paciente
           content:
@@ -685,6 +727,8 @@ paths:
           schema:
             type: string
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Alertas del profesional
           content:
@@ -718,6 +762,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AlertId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Sesión, indicadores afectados y comparación con la línea de base
           content:
@@ -754,6 +800,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AlertId'
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           description: Alerta archivada en el historial de eventos
           content:
@@ -842,6 +890,15 @@ components:
       description: Fin del período (YYYY-MM-DD)
 
   responses:
+    BadRequest:
+      description: El request no cumple el contrato (campo faltante, tipo o formato inválido)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: bad_request
+            message: "/body must have required property 'text'"
     Unauthorized:
       description: Token ausente, inválido o vencido
       content:

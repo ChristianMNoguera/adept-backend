@@ -2,6 +2,12 @@
 
 Para el frontend: qué cambió entre versiones de la API.
 
+ ## 0.2.1
+   - Declara la respuesta 400 (bad_request) en las 15 operaciones con body o parámetros.
+   - Agrega el ejemplo consent_required al 403 de POST /sessions.
+   - Quita info.x-changelog (este archivo es la única fuente).
+   Sin cambios de comportamiento.
+
 ## 0.2.0
 
 ### Agregado
