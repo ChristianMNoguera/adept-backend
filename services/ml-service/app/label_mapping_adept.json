@@ -1,0 +1,13 @@
+{
+  "status": "PROVISIONAL - validar contra el documento de la tesis",
+  "ekman_to_adept": {
+    "joy": "positive_active",
+    "others": "neutral",
+    "surprise": "neutral",
+    "sadness": "withdrawn_sad",
+    "disgust": "withdrawn_sad",
+    "fear": "anxious",
+    "anger": "anxious"
+  },
+  "adept_labels": ["positive_active", "neutral", "withdrawn_sad", "anxious"]
+}
