@@ -17,7 +17,7 @@ adept-backend/
 ├── contracts/
 │   ├── openapi.yaml            Contrato de la API: lo que el frontend y el backend acuerdan.
 │   └── CHANGELOG.md            Qué cambió en cada versión del contrato.
-├── infra/                      Infraestructura (AWS) — fase futura.
+├── infra/                      Infraestructura en AWS (CDK en TypeScript): Cognito + API.
 ├── docs/                       Documentación técnica (decisiones de arquitectura).
 ├── .gitignore                  Archivos que Git no debe guardar.
 └── README.md                   Este archivo.
@@ -68,6 +68,45 @@ Con `DATA_SOURCE=mock` no se valida el token de Cognito. En su lugar:
 | Cualquier ruta con un id de path igual a `not-found` (ej. `GET /professional/alerts/not-found`) | `404 not_found` |
 | Un rol que no corresponde a la operación (ej. paciente en `GET /professional/alerts`) | `403 forbidden` |
 | `DELETE /me` sin `confirm=true` (en modo mock no borra nada) | `400 bad_request` |
+
+### Autenticación (`AUTH_MODE`)
+
+- `AUTH_MODE=mock` (valor por defecto): rol y usuario salen de los headers de prueba de arriba.
+- `AUTH_MODE=cognito`: se verifica el token de acceso de Amazon Cognito que viene en
+  `Authorization: Bearer <token>`. El usuario sale del token y el rol de su grupo
+  (`patients` -> `patient`, `professionals` -> `professional`). Sin token o con token inválido responde
+  `401 unauthorized`; con un usuario sin ninguno de esos grupos, `403 forbidden`. `GET /health` no pide token.
+
+Es independiente de `DATA_SOURCE`: con `AUTH_MODE=cognito` y `DATA_SOURCE=mock` la identidad es real
+y los datos siguen siendo fijos. Si faltan variables de Cognito, el servicio no arranca y dice cuáles faltan.
+
+### Variables de entorno de `conversational-agent`
+
+| Variable | Para qué sirve | Por defecto |
+|---|---|---|
+| `PORT` | Puerto del servidor local | `3000` |
+| `DATA_SOURCE` | `mock` (datos fijos) o `real` (todavía responde 501) | `mock` |
+| `AUTH_MODE` | `mock` o `cognito` | `mock` |
+| `USER_POOL_ID` | Grupo de usuarios de Cognito (obligatoria con `AUTH_MODE=cognito`) | — |
+| `COGNITO_CLIENT_IDS` | IDs de los clientes de Cognito permitidos, separados por comas (obligatoria con `AUTH_MODE=cognito`) | — |
+| `CORS_ORIGINS` | Orígenes permitidos por CORS, separados por comas (`*` = cualquiera) | cualquiera, solo en modo mock |
+| `OPENAPI_SPEC_PATH` | Ruta al contrato OpenAPI | `contracts/openapi.yaml` del repo |
+
+### Pruebas
+
+```bash
+cd services/conversational-agent
+npm test
+```
+
+Prueba el middleware de Cognito con un verificador falso (sin red ni credenciales de AWS).
+
+### Despliegue en AWS
+
+El mismo servicio se despliega como una función Lambda detrás de un API Gateway, con autenticación
+real de Cognito y datos todavía fijos (mock). La infraestructura está en [`infra/`](infra/README.md),
+que explica paso a paso, para Windows PowerShell, cómo desplegarla, crear usuarios de prueba, correr
+`npm run smoke` contra la URL real y borrar todo.
 
 ### CORS
 
@@ -125,4 +164,4 @@ Todo esto se va a ir agregando en etapas siguientes, de a una por vez:
 - Llamadas a un LLM externo.
 - Clasificador de emociones (modelo BETO).
 - Motor de recomendación de ejercicios.
-- Infraestructura AWS.
+- Infraestructura AWS completa: hoy solo existe el stack de desarrollo (Cognito + API con datos mock), sin base de datos ni colas.
