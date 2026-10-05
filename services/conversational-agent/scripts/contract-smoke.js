@@ -10,6 +10,20 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const SPEC_PATH = path.resolve(__dirname, "../../../contracts/openapi.yaml");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
+// Arma el "?a=1&b=2" con los parámetros de query requeridos de la operación.
+// Valor: el primer elemento del enum si existe, y "x" si no.
+function queryRequerida(spec, operation) {
+  const partes = [];
+  for (const param of operation.parameters || []) {
+    // Un parámetro puede ser una referencia ($ref) a components/parameters.
+    const def = param.$ref ? spec.components.parameters[param.$ref.split("/").pop()] : param;
+    if (def.in !== "query" || !def.required) continue;
+    const valor = def.schema?.enum ? def.schema.enum[0] : "x";
+    partes.push(`${encodeURIComponent(def.name)}=${encodeURIComponent(valor)}`);
+  }
+  return partes.length ? "?" + partes.join("&") : "";
+}
+
 async function main() {
   const spec = yaml.load(fs.readFileSync(SPEC_PATH, "utf8"));
   let failures = 0;
@@ -22,7 +36,8 @@ async function main() {
       total++;
 
       // Cada {parametro} de la ruta se reemplaza por x_1.
-      const url = BASE_URL + route.replace(/\{[^}]+\}/g, "x_1");
+      // A eso se le suman los parámetros de query requeridos (ver queryRequerida).
+      const url = BASE_URL + route.replace(/\{[^}]+\}/g, "x_1") + queryRequerida(spec, operation);
 
       // Rol que pide la operación (si es "any" o "none", se usa patient).
       const required = operation["x-required-role"];
