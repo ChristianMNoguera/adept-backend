@@ -6,3 +6,9 @@ venv/
 .env
 .DS_Store
 cdk.out/
+
+# Modelo de ML (pesado, no va a git)
+services/ml-service/models/
+*.safetensors
+*.bin
+*.pt
