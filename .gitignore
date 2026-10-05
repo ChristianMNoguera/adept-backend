@@ -12,3 +12,8 @@ services/ml-service/models/
 *.safetensors
 *.bin
 *.pt
+
+# Notas de trabajo y archivos locales de herramientas (solo en mi maquina)
+docs/sesiones/
+.claude/
+*.log
