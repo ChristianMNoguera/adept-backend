@@ -25,3 +25,9 @@ meRouter.get("/me/consent", (_req, res) => {
 meRouter.put("/me/consent", (_req, res) => {
   res.status(200).json(consentStatus);
 });
+
+// Eliminar la cuenta (CU07). En modo mock no borra nada.
+// El rol "patient" y el parámetro obligatorio confirm=true los controlan los middlewares.
+meRouter.delete("/me", (_req, res) => {
+  res.status(204).end();
+});
