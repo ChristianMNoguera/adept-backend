@@ -17,3 +17,7 @@ services/ml-service/models/
 docs/sesiones/
 .claude/
 *.log
+
+# CDK (salida de cdk synth y cache de contexto)
+infra/cdk.out/
+infra/cdk.context.json
