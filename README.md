@@ -11,14 +11,14 @@ con respuestas fijas (mock) que respetan el contrato de la API.
 adept-backend/
 ├── services/
 │   ├── conversational-agent/   Servicio principal (Node.js + TypeScript + Express).
-│   │                           Expone los endpoints de sesiones que usa el frontend.
+│   │                           Expone la API que usa el frontend (25 operaciones, ver el contrato).
 │   └── ml-service/             Servicio de Machine Learning (Python + FastAPI).
-│                               Más adelante alojará el clasificador de emociones.
+│                               Aloja el modelo de emociones (todavía no expuesto por la API) y su verificación.
 ├── contracts/
 │   ├── openapi.yaml            Contrato de la API: lo que el frontend y el backend acuerdan.
 │   └── CHANGELOG.md            Qué cambió en cada versión del contrato.
 ├── infra/                      Infraestructura (AWS) — fase futura.
-├── docs/                       Documentación técnica (decisiones, resúmenes de sesión).
+├── docs/                       Documentación técnica (decisiones de arquitectura).
 ├── .gitignore                  Archivos que Git no debe guardar.
 └── README.md                   Este archivo.
 ```
@@ -41,7 +41,7 @@ como `.env` y editá `DATA_SOURCE` (`mock` o `real`). Con `real`, todos los endp
 
 ## API
 
-La lista completa de endpoints (24 operaciones), con sus requests, responses y roles, está en
+La lista completa de endpoints (25 operaciones), con sus requests, responses y roles, está en
 [`contracts/openapi.yaml`](contracts/openapi.yaml): es la fuente de verdad. Los cambios entre
 versiones están en [`contracts/CHANGELOG.md`](contracts/CHANGELOG.md).
 
@@ -67,6 +67,7 @@ Con `DATA_SOURCE=mock` no se valida el token de Cognito. En su lugar:
 | `POST /sessions` con el header `x-mock-consent: false` | `403 consent_required` |
 | Cualquier ruta con un id de path igual a `not-found` (ej. `GET /professional/alerts/not-found`) | `404 not_found` |
 | Un rol que no corresponde a la operación (ej. paciente en `GET /professional/alerts`) | `403 forbidden` |
+| `DELETE /me` sin `confirm=true` (en modo mock no borra nada) | `400 bad_request` |
 
 ### CORS
 
@@ -84,7 +85,7 @@ cd services/conversational-agent
 npm run smoke
 ```
 
-Recorre las 24 operaciones del contrato y muestra `ok` o `FAIL` por cada una; termina con
+Recorre las 25 operaciones del contrato y muestra `ok` o `FAIL` por cada una; termina con
 código 1 si alguna falla. Usa `BASE_URL` (por defecto `http://localhost:3000`) si el servidor
 está en otra dirección.
 
