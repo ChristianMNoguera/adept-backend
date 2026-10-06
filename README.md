@@ -17,6 +17,7 @@ adept-backend/
 ├── contracts/
 │   ├── openapi.yaml            Contrato de la API: lo que el frontend y el backend acuerdan.
 │   └── CHANGELOG.md            Qué cambió en cada versión del contrato.
+├── training/                   Entrenamiento del clasificador de emociones (notebook y resultados).
 ├── infra/                      Infraestructura en AWS (CDK en TypeScript): Cognito + API.
 ├── docs/                       Documentación técnica (decisiones de arquitectura).
 ├── .gitignore                  Archivos que Git no debe guardar.
@@ -156,12 +157,20 @@ Las versiones de `requirements.txt` están fijas a propósito: el modelo se entr
 `transformers` 4.57.6, y usar otra versión puede cambiar su comportamiento. Todavía no hay
 ningún endpoint que use el clasificador; por ahora solo se verifica con ese script.
 
+## Entrenamiento del clasificador
+
+El clasificador de emociones (BETO ajustado con EmoEvent_es, siete categorías) se entrena en Google Colab.
+El notebook, los resultados de cada corrida y cómo repetirla están en
+[`training/beto-emoevent/`](training/beto-emoevent/README.md); los descubrimientos, errores corregidos y
+decisiones están en el [registro de experimentación](docs/experimentos/registro-clasificador.md).
+Los pesos del modelo no se versionan.
+
 ## Qué NO está implementado todavía
 
 Todo esto se va a ir agregando en etapas siguientes, de a una por vez:
 
 - Conexión a base de datos.
 - Llamadas a un LLM externo.
-- Clasificador de emociones (modelo BETO).
+- Clasificador de emociones expuesto por la API (el modelo ya se entrena y se verifica, pero ningún endpoint lo usa).
 - Motor de recomendación de ejercicios.
 - Infraestructura AWS completa: hoy solo existe el stack de desarrollo (Cognito + API con datos mock), sin base de datos ni colas.
