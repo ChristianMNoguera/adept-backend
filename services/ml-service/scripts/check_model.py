@@ -2,7 +2,6 @@
 # Se corre desde services/ml-service:  python scripts/check_model.py  [--model-dir RUTA]
 
 import argparse
-import json
 import platform
 import sys
 from pathlib import Path
@@ -70,10 +69,6 @@ def main():
         sys.exit(1)
     print("Orden de etiquetas: OK")
 
-    # Mapeo de emociones (Ekman) a categorías ADEPT.
-    with open(RAIZ / "app" / "label_mapping_adept.json", encoding="utf-8") as f:
-        a_adept = json.load(f)["ekman_to_adept"]
-
     # 4. Clasificar cada frase y compararla con Colab.
     hay_diferencias = False
     print()
@@ -92,7 +87,7 @@ def main():
         ok = emocion1 == emocion_colab and abs(p1 - prob_colab) < TOLERANCIA
         hay_diferencias = hay_diferencias or not ok
         print(f"[{'OK' if ok else 'DIFERENCIA'}] {frase}")
-        print(f"    1) {emocion1} {p1:.2f}   2) {emocion2} {p2:.2f}   -> ADEPT: {a_adept[emocion1]}")
+        print(f"    1) {emocion1} {p1:.2f}   2) {emocion2} {p2:.2f}")
         print(f"    Colab: {emocion_colab} {prob_colab:.2f}")
 
     # 5. Informativo: el preprocesamiento puede variar según la versión de emoji.
