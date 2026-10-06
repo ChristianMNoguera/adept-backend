@@ -21,3 +21,6 @@ docs/sesiones/
 # CDK (salida de cdk synth y cache de contexto)
 infra/cdk.out/
 infra/cdk.context.json
+training/**/model/
+training/**/data/
+.ipynb_checkpoints/
