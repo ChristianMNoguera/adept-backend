@@ -1,0 +1,172 @@
+{
+  "created_at": "2026-10-05T01:14:33",
+  "base_model": "dccuchile/bert-base-spanish-wwm-cased",
+  "dataset": {
+    "name": "EmoEvent (Spanish, EmoEvalEs splits)",
+    "source": "https://raw.githubusercontent.com/fmplaza/EmoEvent/master/splits/es",
+    "rows_used": {
+      "train": 5723,
+      "dev": 844,
+      "test": 1625
+    },
+    "rows_discarded_corrupted": {
+      "train": 0,
+      "dev": 0,
+      "test": 31
+    },
+    "test_repair": {
+      "fused_rows": 1,
+      "empty_text_rows": 30,
+      "label_shift": 30,
+      "dropped": 31,
+      "fused_row_index": 91
+    },
+    "integrity_vs_full_corpus": {
+      "train": {
+        "matched": 4554,
+        "label_agreement": 0.9998
+      },
+      "dev": {
+        "matched": 665,
+        "label_agreement": 1.0
+      },
+      "test": {
+        "matched": 1286,
+        "label_agreement": 1.0
+      }
+    },
+    "class_counts": {
+      "train": {
+        "anger": 589,
+        "disgust": 111,
+        "fear": 65,
+        "joy": 1227,
+        "others": 2800,
+        "sadness": 693,
+        "surprise": 238
+      },
+      "dev": {
+        "anger": 85,
+        "disgust": 16,
+        "fear": 9,
+        "joy": 181,
+        "others": 414,
+        "sadness": 104,
+        "surprise": 35
+      },
+      "test": {
+        "anger": 162,
+        "disgust": 33,
+        "fear": 21,
+        "joy": 346,
+        "others": 801,
+        "sadness": 196,
+        "surprise": 66
+      }
+    }
+  },
+  "config": {
+    "seed": 42,
+    "max_len": 128,
+    "epochs_max": 6,
+    "batch_train": 32,
+    "learning_rate": 3e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "early_stop_patience": 2,
+    "class_weights": "sqrt",
+    "demojize": true,
+    "labels_order": [
+      "anger",
+      "disgust",
+      "fear",
+      "joy",
+      "others",
+      "sadness",
+      "surprise"
+    ]
+  },
+  "environment": {
+    "python": "3.13.15",
+    "torch": "2.11.0+cu130",
+    "transformers": "4.57.6",
+    "gpu": "Tesla T4"
+  },
+  "training_minutes": 4.3,
+  "best_epoch_dev_macro_f1": 0.561753471248582,
+  "results": {
+    "dev_7_classes": {
+      "accuracy": 0.7227488151658767,
+      "macro_f1": 0.561753471248582,
+      "weighted_f1": 0.7195082562120618
+    },
+    "test_7_classes": {
+      "accuracy": 0.7058461538461539,
+      "macro_f1": 0.5472411123354324,
+      "weighted_f1": 0.7026012548106394
+    },
+    "test_7_classes_per_class": {
+      "anger": {
+        "precision": 0.5603864734299517,
+        "recall": 0.7160493827160493,
+        "f1-score": 0.6287262872628726,
+        "support": 162.0
+      },
+      "disgust": {
+        "precision": 0.1,
+        "recall": 0.030303030303030304,
+        "f1-score": 0.046511627906976744,
+        "support": 33.0
+      },
+      "fear": {
+        "precision": 0.5384615384615384,
+        "recall": 0.6666666666666666,
+        "f1-score": 0.5957446808510638,
+        "support": 21.0
+      },
+      "joy": {
+        "precision": 0.684375,
+        "recall": 0.6329479768786127,
+        "f1-score": 0.6576576576576577,
+        "support": 346.0
+      },
+      "others": {
+        "precision": 0.7855329949238579,
+        "recall": 0.7727840199750312,
+        "f1-score": 0.7791063561988673,
+        "support": 801.0
+      },
+      "sadness": {
+        "precision": 0.7549019607843137,
+        "recall": 0.7857142857142857,
+        "f1-score": 0.77,
+        "support": 196.0
+      },
+      "surprise": {
+        "precision": 0.34285714285714286,
+        "recall": 0.36363636363636365,
+        "f1-score": 0.35294117647058826,
+        "support": 66.0
+      },
+      "accuracy": 0.7058461538461539,
+      "macro avg": {
+        "precision": 0.5380735872081149,
+        "recall": 0.5668716751271485,
+        "f1-score": 0.5472411123354324,
+        "support": 1625.0
+      },
+      "weighted avg": {
+        "precision": 0.7027602065720933,
+        "recall": 0.7058461538461539,
+        "f1-score": 0.7026012548106394,
+        "support": 1625.0
+      }
+    },
+    "test_4_classes_adept_provisional": {
+      "accuracy": 0.736,
+      "macro_f1": 0.6979385722543172,
+      "weighted_f1": 0.7370378610983056
+    },
+    "baseline_umuteam_test_7_classes": null
+  }
+}
