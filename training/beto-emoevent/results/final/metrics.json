@@ -1,0 +1,175 @@
+{
+  "created_at": "2026-10-09T19:27:56",
+  "run_name": "final",
+  "base_model": "dccuchile/bert-base-spanish-wwm-cased",
+  "dataset": {
+    "name": "EmoEvent_es (particiones EmoEvalEs)",
+    "source": "https://raw.githubusercontent.com/fmplaza/EmoEvent/master/splits/es",
+    "rows_used": {
+      "train": 5723,
+      "dev": 844,
+      "test": 1656
+    },
+    "test_repair": {
+      "fused_rows": 1,
+      "empty_text_rows": 30,
+      "label_shift": 30,
+      "recovered": 31,
+      "fused_row_index": 91
+    },
+    "integrity_vs_full_corpus": {
+      "train": {
+        "matched": 4554,
+        "label_agreement": 0.9998
+      },
+      "dev": {
+        "matched": 665,
+        "label_agreement": 1.0
+      },
+      "test": {
+        "matched": 1309,
+        "label_agreement": 1.0
+      },
+      "test_recovered_rows": {
+        "matched": 23,
+        "label_agreement": 1.0
+      }
+    },
+    "class_counts": {
+      "train": {
+        "anger": 589,
+        "disgust": 111,
+        "fear": 65,
+        "joy": 1227,
+        "others": 2800,
+        "sadness": 693,
+        "surprise": 238
+      },
+      "dev": {
+        "anger": 85,
+        "disgust": 16,
+        "fear": 9,
+        "joy": 181,
+        "others": 414,
+        "sadness": 104,
+        "surprise": 35
+      },
+      "test": {
+        "anger": 168,
+        "disgust": 33,
+        "fear": 21,
+        "joy": 354,
+        "others": 814,
+        "sadness": 199,
+        "surprise": 67
+      }
+    }
+  },
+  "config": {
+    "seed": 42,
+    "max_len": 128,
+    "epochs_max": 5,
+    "batch_train": 16,
+    "optimizer": "adamw_torch",
+    "learning_rate": 2e-05,
+    "weight_decay": 0.0,
+    "warmup_ratio": 0.0,
+    "early_stop_patience": 2,
+    "class_weights": null,
+    "demojize": true,
+    "labels_order": [
+      "anger",
+      "disgust",
+      "fear",
+      "joy",
+      "others",
+      "sadness",
+      "surprise"
+    ]
+  },
+  "environment": {
+    "python": "3.13.15",
+    "torch": "2.11.0+cu130",
+    "transformers": "4.57.6",
+    "emoji": "2.16.0",
+    "gpu": "Tesla T4"
+  },
+  "training_minutes": 4.8,
+  "best_epoch_dev_macro_f1": 0.5550731680555093,
+  "results": {
+    "dev_7_classes": {
+      "accuracy": 0.6978672985781991,
+      "macro_f1": 0.5550731680555093,
+      "weighted_f1": 0.691328374971793
+    },
+    "test_7_classes": {
+      "accuracy": 0.7004830917874396,
+      "macro_f1": 0.528081510353085,
+      "weighted_f1": 0.6952547011476652
+    },
+    "test_7_classes_per_class": {
+      "anger": {
+        "precision": 0.578125,
+        "recall": 0.6607142857142857,
+        "f1-score": 0.6166666666666667,
+        "support": 168.0
+      },
+      "disgust": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 33.0
+      },
+      "fear": {
+        "precision": 0.5416666666666666,
+        "recall": 0.6190476190476191,
+        "f1-score": 0.5777777777777777,
+        "support": 21.0
+      },
+      "joy": {
+        "precision": 0.6377551020408163,
+        "recall": 0.7062146892655368,
+        "f1-score": 0.6702412868632708,
+        "support": 354.0
+      },
+      "others": {
+        "precision": 0.7812895069532237,
+        "recall": 0.7592137592137592,
+        "f1-score": 0.7700934579439253,
+        "support": 814.0
+      },
+      "sadness": {
+        "precision": 0.772020725388601,
+        "recall": 0.7487437185929648,
+        "f1-score": 0.7602040816326531,
+        "support": 199.0
+      },
+      "surprise": {
+        "precision": 0.3220338983050847,
+        "recall": 0.2835820895522388,
+        "f1-score": 0.30158730158730157,
+        "support": 67.0
+      },
+      "accuracy": 0.7004830917874396,
+      "macro avg": {
+        "precision": 0.5189844141934846,
+        "recall": 0.5396451659123435,
+        "f1-score": 0.528081510353085,
+        "support": 1656.0
+      },
+      "weighted avg": {
+        "precision": 0.6916928504354742,
+        "recall": 0.7004830917874396,
+        "f1-score": 0.6952547011476652,
+        "support": 1656.0
+      }
+    },
+    "acceptance_criterion": {
+      "metric": "macro_f1",
+      "threshold": 0.7,
+      "value": 0.528081510353085,
+      "meets": false
+    },
+    "baseline_umuteam_test_7_classes": null
+  }
+}
