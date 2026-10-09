@@ -3,7 +3,7 @@
 # el archivo queda solo con las columnas id, emotion, predicted y confidence.
 #
 # Uso:  python sanitize_predictions.py RUTA/test_predictions.csv
-# OJO: reescribe el archivo indicado (trabajá sobre la copia que está en el repo).
+# OJO: reescribe el archivo indicado (se trabaja sobre la copia que está en el repo).
 
 import csv
 import sys
