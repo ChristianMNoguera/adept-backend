@@ -9,9 +9,9 @@ El entrenamiento se hace en **Google Colab** y forma parte del entregable de la 
 ```
 training/beto-emoevent/
 ├── notebooks/            El notebook de entrenamiento (para Colab).
-├── runs/                 Copias ejecutadas del notebook de las corridas importantes (se agregan con la corrida final).
+├── runs/                 Copia del notebook con la configuración de la corrida final (final_executed.ipynb, sin salidas guardadas).
 ├── results/
-│   ├── runs_log.csv      Una fila por corrida de ajuste (configuración y métricas de desarrollo).
+│   ├── runs_log.csv      Una fila por corrida (las 4 de ajuste y la final), con configuración y métricas de desarrollo.
 │   ├── training_log_*.csv   Curva de entrenamiento de cada corrida de ajuste.
 │   ├── preliminary/      Resultados de la primera corrida (v2), sin texto de tuits.
 │   └── final/            Resultados de la corrida final: metrics.json, training_log_final.csv, matriz de confusión y predicciones (sin texto de tuits).
@@ -19,7 +19,7 @@ training/beto-emoevent/
     └── sanitize_predictions.py   Quita el texto de los tuits de un archivo de predicciones.
 ```
 
-`results/final/` ya existe. `runs/` va a guardar la copia ejecutada del notebook de la corrida final y todavía no está en el repo.
+`results/final/` y `runs/` ya existen. El notebook de `runs/` se guardó sin las salidas de la ejecución para no incluir texto de tuits del corpus; lo que sí queda es la configuración de la corrida (`SEED = 42`, sin pesos por clase, `FINAL_RUN = True`).
 
 ## Cómo repetir una corrida en Colab
 
