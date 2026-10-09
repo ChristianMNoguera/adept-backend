@@ -20,15 +20,17 @@ from app.preprocessing import preprocess  # noqa: E402
 ORDEN_ESPERADO = {0: "anger", 1: "disgust", 2: "fear", 3: "joy", 4: "others", 5: "sadness", 6: "surprise"}
 
 # Frases de prueba y lo que dio Colab: (frase, emoción principal, probabilidad).
+# Valores del modelo final (corrida "final"), tomados de Colab el 2026-10-09
+# (CPU, torch 2.11.0, transformers 5.18.0, emoji 2.16.0).
 FRASES = [
-    ("Hoy me levanté con ganas de salir a caminar", "joy", 0.55),
-    ("Ayer vino mi nieto y pasamos una tarde hermosa", "joy", 0.84),
-    ("Me siento muy solo desde que se fue mi esposa", "sadness", 0.97),
-    ("No tengo ganas de hablar con nadie", "others", 0.89),
-    ("Estoy muy nervioso por el resultado de los estudios", "fear", 0.95),
-    ("Me da mucha bronca que no me atiendan en la obra social", "anger", 0.62),
-    ("El otro día me olvidé dónde dejé las llaves y me asusté", "fear", 0.83),
-    ("Hoy fue un día como cualquier otro", "others", 0.63),
+    ("Hoy me levanté con ganas de salir a caminar", "joy", 0.58),
+    ("Ayer vino mi nieto y pasamos una tarde hermosa", "joy", 0.99),
+    ("Me siento muy solo desde que se fue mi esposa", "sadness", 0.99),
+    ("No tengo ganas de hablar con nadie", "others", 0.99),
+    ("Estoy muy nervioso por el resultado de los estudios", "fear", 0.93),
+    ("Me da mucha bronca que no me atiendan en la obra social", "anger", 0.89),
+    ("El otro día me olvidé dónde dejé las llaves y me asusté", "fear", 0.60),
+    ("Hoy fue un día como cualquier otro", "others", 0.68),
 ]
 
 # Diferencia máxima de probabilidad para dar OK.
