@@ -21,23 +21,22 @@ trazable, en vez de perderse cada vez que algo se actualiza.
 
 | ADR | Título | Estado | Fecha |
 |-----|--------|--------|-------|
-| [0001](0001-monorepo.md) | Organización del repositorio como monorepo | Aceptada | 2026-09-27 |
-| [0002](0002-proveedor-llm.md) | Proveedor de LLM externo vía interfaz adapter | Aceptada | 2026-09-25 |
-| [0003](0003-contrato-openapi.md) | Contrato de API first con OpenAPI | Aceptada | 2026-09-27 |
-| [0004](0004-data-source-mock-real.md) | Selección de origen de datos vía `DATA_SOURCE` | Aceptada | 2026-09-28 |
-| [0005](0005-localstack-cdk.md) | LocalStack + AWS CDK para infraestructura local | Aceptada | 2026-09-28 |
-| [0006](0006-alcance-mvp.md) | Alcance del MVP del backend | Reemplazada por ADR-0008 | 2026-09-23 |
-| [0007](0007-umbral-isolation-forest.md) | Umbral de Isolation Forest gestionado fuera de la app | Reemplazada por ADR-0009 | 2026-09-29 |
-| [0008](0008-alcance-mvp-corregido.md) | Alcance del MVP del backend (corrige el 0006) | Aceptada | 2026-09-30 |
+| [0001](0001-monorepo.md) | Organización del repositorio como monorepo | Aceptada | 2026-10-03 |
+| [0002](0002-proveedor-llm.md) | Proveedor de LLM externo vía interfaz adapter | Aceptada | 2026-10-03 |
+| [0003](0003-contrato-openapi.md) | Contrato de API first con OpenAPI | Aceptada | 2026-10-03 |
+| [0004](0004-data-source-mock-real.md) | Selección de origen de datos vía `DATA_SOURCE` | Aceptada | 2026-10-03 |
+| [0005](0005-localstack-cdk.md) | LocalStack + AWS CDK para infraestructura local | Aceptada | 2026-10-03 |
+| [0006](0006-alcance-mvp.md) | Alcance del MVP del backend | Reemplazada por ADR-0008 | 2026-10-03 |
+| [0007](0007-umbral-isolation-forest.md) | Umbral de Isolation Forest gestionado fuera de la app | Reemplazada por ADR-0009 | 2026-10-03 |
+| [0008](0008-alcance-mvp-corregido.md) | Alcance del MVP del backend (corrige el 0006) | Aceptada | 2026-10-04 |
 | [0009](0009-parametros-detector-anomalias.md) | Parámetros del detector de anomalías (reemplaza al 0007) | Aceptada | 2026-10-04 |
 | [0010](0010-autenticacion-cognito.md) | Autenticación con Amazon Cognito | Aceptada | 2026-10-04 |
-| [0011](0011-transporte-rest-y-cierre-de-sesion.md) | Transporte REST y procesamiento por lotes al cerrar la sesión | Aceptada | 2026-10-01 |
-| [0012](0012-clasificador-emocional.md) | Clasificador emocional (BETO sobre EmoEvent_es) | Aceptada | 2026-09-15 |
+| [0011](0011-transporte-rest-y-cierre-de-sesion.md) | Transporte REST y procesamiento por lotes al cerrar la sesión | Aceptada | 2026-10-04 |
+| [0012](0012-clasificador-emocional.md) | Clasificador emocional (BETO sobre EmoEvent_es) | Aceptada | 2026-10-04 |
+| [0013](0013-despliegue-inicial-aws-y-costos.md) | Despliegue inicial en AWS y control de costos | Aceptada | 2026-10-06 |
 
 ## Cómo se suma un ADR nuevo
 
 Cada vez que cerremos un ladrillo del desarrollo que implique una decisión
 de arquitectura (no solo una tarea de código), se agrega un archivo nuevo
-numerado correlativamente y se agrega una fila a esta tabla. Las decisiones sobre
-despliegue y costos en AWS (región, API HTTP, sin VPC/NAT, Parameter Store y
-alertas de presupuesto) se registran al cerrar el Hito 3.
+numerado correlativamente y se agrega una fila a esta tabla.

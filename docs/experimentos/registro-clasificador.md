@@ -5,10 +5,11 @@ Documento vivo del equipo. Ubicación sugerida en el repositorio:
 como una entrada nueva, con su fecha real y su evidencia. Las entradas ya escritas no se
 reescriben: si algo se corrige, se agrega una entrada que lo explica.
 
-- **Última actualización:** 2026-10-05
+- **Última actualización:** 2026-10-09
 - **Ejecución de los entrenamientos:** Google Colab, GPU T4
-- **Estado:** variantes en desarrollo completadas; configuración a confirmar; corrida final pendiente
-
+- **Estado:** corrida final completada (2026-10-09); criterio de aceptación (F1 macro ≥ 0,70) no alcanzado; decisión sobre el criterio pendiente de revision y decision.
+- **Convención de fechas:** las horas son UTC y salen de los archivos que generó cada
+  corrida (`metrics.json`, `runs_log.csv`). En Buenos Aires son 3 horas menos.
 
 ## 1. Objetivo
 
@@ -31,7 +32,7 @@ configuración final evalúan el conjunto de prueba.
 | `base_s43` | 2026-10-05 17:52 | igual a `base`, semilla 43 | 0,6991 | 0,5532 | 0,6894 | Solo desarrollo |
 | `sqrt_s42` | 2026-10-05 18:07 | `base` con pesos `sqrt`, semilla 42 | 0,7085 | 0,5571 | 0,7060 | Mejor época: 3 |
 | `sqrt_s43` | 2026-10-05 18:23 | `base` con pesos `sqrt`, semilla 43 | 0,7133 | 0,5685 | 0,7069 | Mejor época: 4 |
-| `final` | pendiente | configuración elegida con desarrollo, semilla 42 | | | | Única corrida que evalúa el test |
+| `final` | 2026-10-09 19:27 | igual a `base` (configuración de la tesis), semilla 42 | 0,6979 | 0,5551 | 0,6913 | Única corrida que evalúa el test: accuracy 0,7005, F1 macro 0,5281, F1 ponderado 0,6953 |
 
 Regla de selección, fijada antes de ver los resultados de las variantes: se compara el
 promedio entre semillas de la F1 macro de desarrollo; si la diferencia entre
@@ -48,14 +49,14 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
 
 ## 4. Cronología
 
-### 4.1 Selección del corpus
+### 4.1 Selección del corpus (hasta el 2026-09-04)
 - **Hecho:** se detectó que el corpus citado originalmente (eRisk) es inglés y de Reddit,
   incompatible con BETO (español). Se evaluaron eRisk, MentalRiskES y EmoEvalEs/EmoEvent.
 - **Decisión:** EmoEvent_es, por ser español, tener etiquetas humanas de emociones
   finas y no requerir pseudo-etiquetado.
 - **Evidencia:** conversación de análisis previa del proyecto; ADR-0012.
 
-### 4.2 Corrida inicial
+### 4.2 Corrida inicial (2026-10-05 00:47 UTC, notebook v1)
 - **Resultado:** dev accuracy 0,7239 y F1 macro 0,5628; test accuracy **0,3354** y F1
   macro **0,1764**.
 - **Hallazgo:** una brecha de casi 40 puntos entre dos particiones de la misma
@@ -72,7 +73,7 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   `test_predictions.csv`) se sobrescribieron en Drive al correr v2, porque ambas escriben en
   la misma carpeta de salida; solo se conservan si el equipo los había descargado.
 
-### 4.3 Verificación y reparación de los datos
+### 4.3 Verificación y reparación de los datos (2026-10-05)
 - **Verificación independiente:** se cruzaron los tuits con el corpus completo
   `emoevent_es.csv`. Coincidencia de etiquetas: train 100 % (4.554 emparejados), dev 100 %
   (665), test **sin reparar 34,7 %** y **reparado 100 %** (1.286).
@@ -84,7 +85,7 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   coincidencia con el corpus completo es menor al 99 %. El test queda en las 1.656 filas
   oficiales (en v1 y v2 se habían descartado 31, quedando 1.625).
 
-### 4.4 Corrida v2 con datos reparados
+### 4.4 Corrida v2 con datos reparados (2026-10-05 01:14 UTC)
 - **Configuración:** la misma que v1 (lote 32, 3×10⁻⁵, pesos `sqrt`), con test de 1.625 filas.
 - **Resultado:** dev accuracy 0,7227, F1 macro 0,5618; **test accuracy 0,7058, F1 macro
   0,5472, F1 ponderado 0,7026**.
@@ -111,7 +112,7 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
 - **Servicio:** el modelo v2 se cargó en `ml-service` con las versiones fijadas y reprodujo
   las ocho salidas de Colab con la misma emoción y la misma probabilidad a dos decimales.
 
-### 4.6 Contraste con la especificación de la tesis
+### 4.6 Contraste con la especificación de la tesis (2026-10-05)
 - **Hecho:** se comparó la configuración usada con la de la tesis (versión del documento del
   2026-10-04).
 - **Diferencias encontradas:** lote 32 frente a 16; tasa 3×10⁻⁵ frente a 2×10⁻⁵; máximo 6
@@ -121,7 +122,7 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   un flujo en dos tiempos: las corridas de ajuste solo evalúan desarrollo y la corrida
   final evalúa el test una única vez. Las variantes se registran en `runs_log.csv`.
 
-### 4.7 Corrida `base` del notebook v3
+### 4.7 Corrida `base` del notebook v3 (2026-10-05 04:08 UTC)
 - **Resultado (desarrollo):** accuracy 0,6979, F1 macro 0,5551, F1 ponderado 0,6913;
   entrenamiento de 4,5 minutos.
 - **Por época:**
@@ -141,7 +142,7 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   activó porque la F1 macro no tuvo dos épocas seguidas sin mejora.
 - **Evidencia:** `results/runs_log.csv` y `results/training_log_base.csv`.
 
-### 4.8 Variantes en desarrollo
+### 4.8 Variantes en desarrollo (2026-10-05, 17:52 a 18:24 UTC)
 - **Hecho:** tres corridas adicionales, solo con desarrollo: `base_s43`, `sqrt_s42` y
   `sqrt_s43`. El test no se evaluó.
 - **Resultado (media de dos semillas):**
@@ -168,9 +169,51 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   guardaron copias ejecutadas del notebook de estas tres corridas; los registros
   contienen la configuración y los resultados de cada una.
 
-### 4.9 Pendiente
-Confirmación de la configuración, corrida final con evaluación única del test (y copia
-ejecutada del notebook), y copia del modelo a `ml-service`.
+### 4.9 Corrida final (2026-10-09 19:27 UTC)
+- **Configuración:** la de la tesis y la elegida por la regla de selección (entrada 4.8):
+  lote 16, 2×10⁻⁵, sin pesos por clase, máx. 5 épocas, semilla 42, siete categorías.
+  Test de 1.656 filas (reparado y verificado), evaluado por única vez. Entrenamiento de
+  4,8 minutos en Tesla T4 (torch 2.11.0+cu130, transformers 4.57.6, emoji 2.16.0).
+- **Reproducibilidad:** las métricas de desarrollo coinciden con las de la corrida `base`
+  (misma configuración y semilla) a cuatro decimales: accuracy 0,6979, F1 macro 0,5551,
+  F1 ponderado 0,6913.
+- **Resultado en test:** accuracy **0,7005**, F1 macro **0,5281**, F1 ponderado **0,6953**.
+- **F1 por categoría (test):**
+
+| Categoría | Precisión | Recall | F1 | Ejemplos |
+|---|---|---|---|---|
+| others | 0,781 | 0,759 | 0,770 | 814 |
+| sadness | 0,772 | 0,749 | 0,760 | 199 |
+| joy | 0,638 | 0,706 | 0,670 | 354 |
+| anger | 0,578 | 0,661 | 0,617 | 168 |
+| fear | 0,542 | 0,619 | 0,578 | 21 |
+| surprise | 0,322 | 0,284 | 0,302 | 67 |
+| disgust | 0,000 | 0,000 | 0,000 | 33 |
+
+- **Criterio de aceptación (F1 macro ≥ 0,70):** **no se cumple** (0,5281). El F1
+  ponderado (0,6953) tampoco llega a 0,70, por 0,005. La accuracy (0,7005) lo supera por
+  poco, pero no es la métrica del criterio.
+- **Lectura:** el desempeño en las cinco categorías con más ejemplos es razonable
+  (F1 entre 0,58 y 0,77); la F1 macro queda baja por `disgust`, que el modelo no acierta
+  en ninguno de sus 33 ejemplos, y por `surprise` (0,30). Sin esas dos clases el promedio
+  sería 0,68, pero ese número no se usa para reportar el resultado: el criterio se evalúa
+  sobre las siete categorías.
+- **Comparación con v2 (entrada 4.4):** v2 había dado F1 macro 0,5472 y ponderado 0,7026
+  con otra configuración y un test de 1.625 filas; no son corridas comparables en sentido
+  estricto. La diferencia se concentra en `disgust` (0,047 a 0,000) y `surprise` (0,353 a
+  0,302). Por la regla fijada de antemano, no se cambia de configuración a la vista del
+  test; los pesos `sqrt` quedan como mejora posible (sección 9).
+- **Decisión:** el resultado se informa tal cual. La enmienda del criterio (F1 ponderado)
+  se consulta con el tutor; con este resultado no lo alcanzaría, por lo que cambiar la
+  métrica no resuelve el incumplimiento y, hecho después de ver el test, debe declararse
+  como tal.
+- **Evidencia:** `results/final/` (`metrics.json`, `test_predictions.csv` sin el texto de
+  los tuits, `confusion_matrix_test.png`, `training_log.csv`), `results/runs_log.csv` y la
+  copia ejecutada del notebook en `runs/`.
+
+### 4.10 Pendiente
+Prueba cualitativa de las ocho frases con el modelo final, copia del modelo final a
+`ml-service` y actualización de `check_model.py`, y decisión del criterio.
 
 ## 5. Hallazgos
 
@@ -181,8 +224,9 @@ ejecutada del notebook), y copia del modelo a `ml-service`.
 3. **La columna "MacroF1" del ranking de EmoEvalEs es en realidad un F1 ponderado.** En los
    cinco sistemas listados, el recall coincide exactamente con el accuracy, algo que solo
    ocurre con el promedio ponderado por soporte. El criterio de la tesis (F1 macro ≥ 0,70)
-   se construyó sobre esa cifra, y con el modelo actual la F1 macro ronda 0,55 y la
-   ponderada 0,70. Acción pendiente: decidir el criterio y reportar siempre ambas.
+   se construyó sobre esa cifra. Con el modelo final (corrida del 2026-10-09) la F1 macro
+   es 0,528 y la ponderada 0,695: ninguna alcanza 0,70. Acción pendiente: consultar con el
+   tutor y reportar siempre ambas.
 4. **Las clases minoritarias limitan la F1 macro.** `fear`, `disgust` y `surprise` tienen
    pocos ejemplos; `disgust` casi no se predice.
 5. **Brecha de dominio.** El corpus son tuits de abril de 2019 sobre eventos; ADEPT
@@ -198,7 +242,8 @@ ejecutada del notebook), y copia del modelo a `ml-service`.
 | Reparar y verificar el test en cada corrida | Defecto del archivo público | 2026-10-05 | Entrada 4.3 |
 | Test evaluado una sola vez, en la corrida final | Metodología de la tesis | 2026-10-05 | Notebook v3 |
 | Variantes elegidas solo con desarrollo y por promedio de semillas | Evitar ajustar sobre el test | 2026-10-05 | Sección 2 |
-| Configuración base para la corrida final (propuesta) | Regla de selección fijada de antemano: diferencia de F1 macro menor a 0,01 | 2026-10-05 | Entrada 4.8 |
+| Configuración base para la corrida final | Regla de selección fijada de antemano: diferencia de F1 macro menor a 0,01 | 2026-10-09 | Entradas 4.8 y 4.9 |
+| Informar el resultado final sin cambiar configuración ni criterio a la vista del test | Evitar ajustar sobre el test | 2026-10-09 | Entrada 4.9 |
 
 ## 7. Errores cometidos y corregidos
 
@@ -221,6 +266,7 @@ ejecutada del notebook), y copia del modelo a `ml-service`.
   elección de la mejor época y de las variantes tiene ruido. Se mitiga con dos semillas.
 - **El resultado final dependerá de una sola semilla.** Se reporta como tal.
 - **Validez externa limitada** (hallazgo 5).
+- **Cualquier cambio del criterio de aceptación se decidiría después de ver el test.** Por eso, si se enmienda, debe declararse así y respaldarse con la evidencia externa (hallazgo 3), no con el resultado.
 
 ## 9. Mejoras detectadas
 
@@ -259,7 +305,14 @@ docs/experimentos/registro-clasificador.md
 - **Reproducción:** abrir el notebook en Colab con GPU T4, fijar `RUN_NAME`, `SEED` y
   `CLASS_WEIGHTS`, y ejecutar todo. Con `FINAL_RUN = False` no se toca el test.
 
-## 11. Plantilla para nuevas entradas
+## 11. Uso de herramientas de IA en esta etapa
+
+El diseño del notebook, el análisis de resultados y la redacción de este registro se
+hicieron con asistencia de Claude (Anthropic); las corridas las ejecuta y revisa el
+equipo. Redacción a conciliar con la declaración de uso de IA de la tesis y con la
+normativa de la universidad.
+
+## 12. Plantilla para nuevas entradas
 
 ```
 ### 4.x Título (fecha y hora UTC)
