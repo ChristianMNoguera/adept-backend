@@ -126,8 +126,9 @@ export class AdeptDevStack extends cdk.Stack {
         AUTH_MODE: "cognito",
         DATA_SOURCE: "mock",
         USER_POOL_ID: userPool.userPoolId,
-        // Solo los clientes de las apps; el de pruebas no se acepta.
-        COGNITO_CLIENT_IDS: `${mobileClient.userPoolClientId},${webClient.userPoolClientId}`,
+        // Clientes móvil y web, más el de pruebas (adept-dev-test): se incluye solo en el stack de
+        // desarrollo porque los tokens de prueba (scripts/test-users.mjs) salen de ese cliente.
+        COGNITO_CLIENT_IDS: `${mobileClient.userPoolClientId},${webClient.userPoolClientId},${testClient.userPoolClientId}`,
         // "*" en desarrollo; se cambia con: cdk deploy -c corsOrigins=https://mi-panel.example
         CORS_ORIGINS: this.node.tryGetContext("corsOrigins") ?? "*",
         // El contrato viaja dentro del paquete (ver commandHooks).
