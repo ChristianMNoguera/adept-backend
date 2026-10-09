@@ -2,7 +2,7 @@
 
 Esta carpeta guarda todo lo necesario para entender y repetir el entrenamiento del clasificador de emociones de ADEPT: **BETO** (un modelo de lenguaje en español) ajustado con el corpus **EmoEvent_es**, con las siete categorías nativas del corpus: `anger`, `disgust`, `fear`, `joy`, `sadness`, `surprise` y `others`.
 
-El entrenamiento se hace en **Google Colab** (no en tu máquina) y forma parte del entregable de la tesis: el notebook, los resultados de cada corrida y el registro de experimentación.
+El entrenamiento se hace en **Google Colab** y forma parte del entregable de la tesis: el notebook, los resultados de cada corrida y el registro de experimentación.
 
 ## Estructura
 
@@ -14,12 +14,12 @@ training/beto-emoevent/
 │   ├── runs_log.csv      Una fila por corrida de ajuste (configuración y métricas de desarrollo).
 │   ├── training_log_*.csv   Curva de entrenamiento de cada corrida de ajuste.
 │   ├── preliminary/      Resultados de la primera corrida (v2), sin texto de tuits.
-│   └── final/            Resultados de la corrida final (se agrega al terminar).
+│   └── final/            Resultados de la corrida final: metrics.json, training_log_final.csv, matriz de confusión y predicciones (sin texto de tuits).
 └── scripts/
     └── sanitize_predictions.py   Quita el texto de los tuits de un archivo de predicciones.
 ```
 
-`runs/` y `results/final/` aparecen cuando se incorpora la corrida final.
+`results/final/` ya existe. `runs/` va a guardar la copia ejecutada del notebook de la corrida final y todavía no está en el repo.
 
 ## Cómo repetir una corrida en Colab
 
@@ -36,8 +36,18 @@ training/beto-emoevent/
 
 ## Dónde queda cada resultado
 
-- En Colab, todo se guarda en tu Google Drive: `Mi unidad/ADEPT/beto-emoevent/`.
+- En Colab, todo se guarda en Google Drive: `Mi unidad/ADEPT/beto-emoevent/`.
 - En este repo se copian solo los resultados livianos: `results/runs_log.csv`, los `training_log_*.csv` y, de cada corrida con test, `metrics.json`, la matriz de confusión y las predicciones (**sin el texto de los tuits**, ver abajo).
+
+## Resultado de la corrida final
+
+Evaluación en el conjunto de test (1.656 instancias, siete categorías), tomada de `results/final/metrics.json`:
+
+| Métrica | Valor |
+|---|---|
+| Accuracy | 0,7005 |
+| F1 macro | 0,5281 |
+| F1 ponderado | 0,6953 |
 
 ## Los pesos del modelo no se versionan
 

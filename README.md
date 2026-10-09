@@ -165,6 +165,9 @@ El notebook, los resultados de cada corrida y cómo repetirla están en
 decisiones están en el [registro de experimentación](docs/experimentos/registro-clasificador.md).
 Los pesos del modelo no se versionan.
 
+Resultado de la corrida final en el conjunto de test (de `training/beto-emoevent/results/final/metrics.json`):
+accuracy 0,7005, F1 macro 0,5281 y F1 ponderado 0,6953.
+
 ## Qué NO está implementado todavía
 
 Todo esto se va a ir agregando en etapas siguientes, de a una por vez:
