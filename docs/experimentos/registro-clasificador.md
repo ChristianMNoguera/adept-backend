@@ -6,8 +6,8 @@ como una entrada nueva, con su fecha real y su evidencia. Las entradas ya escrit
 reescriben: si algo se corrige, se agrega una entrada que lo explica.
 
 - **Última actualización:** 2026-10-09
-- **Ejecución de los entrenamientos:** Google Colab, GPU T4
-- **Estado:** corrida final completada (2026-10-09); criterio de aceptación (F1 macro ≥ 0,70) no alcanzado; decisión sobre el criterio pendiente de revision y decision.
+- **Ejecución de los entrenamientos:** Christian Noguera (Google Colab, GPU T4)
+- **Estado:** corrida final completada (2026-10-09); criterio de aceptación (F1 macro ≥ 0,70) no alcanzado; la tesis lo informa tal cual (decisión del equipo, entrada 4.10)
 - **Convención de fechas:** las horas son UTC y salen de los archivos que generó cada
   corrida (`metrics.json`, `runs_log.csv`). En Buenos Aires son 3 horas menos.
 
@@ -211,9 +211,51 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
   los tuits, `confusion_matrix_test.png`, `training_log.csv`), `results/runs_log.csv` y la
   copia ejecutada del notebook en `runs/`.
 
-### 4.10 Pendiente
-Prueba cualitativa de las ocho frases con el modelo final, copia del modelo final a
-`ml-service` y actualización de `check_model.py`, y decisión del criterio.
+### 4.10 Matriz de confusión, aclaración sobre la evidencia y decisión del criterio (2026-10-09)
+- **Matriz de confusión del test (normalizada por fila):** `disgust` se predice como
+  `anger` en 0,45 de los casos, como `others` en 0,24 y como `joy` en 0,12; casi nunca se
+  predice `disgust` (la columna es prácticamente cero). Los errores van sobre todo hacia
+  `others`: `surprise` 0,40, `fear` 0,24, `joy` 0,22, `anger` 0,18 y `sadness` 0,13.
+  `surprise` también se confunde con `joy` (0,22). Las diagonales coinciden con los
+  recalls de `metrics.json`.
+- **Lectura:** la dificultad de `disgust` no es solo la cantidad de ejemplos: el modelo no
+  la distingue de `anger`. Y el error dominante es subdetectar emoción (caer en `others`),
+  que coincide con lo observado en la frase de retraimiento (entrada 4.5).
+- **Aclaración sobre la evidencia (corrige 4.9):** la copia del notebook en
+  `runs/final_executed.ipynb` **no tiene salidas guardadas**: guarda la configuración de la
+  corrida, no su ejecución. La evidencia de la ejecución es `metrics.json` (fecha, entorno,
+  configuración y resultados), `training_log_final.csv`, `runs_log.csv`, la matriz y las
+  predicciones. Por eso la salida de la prueba de las ocho frases en Colab con el modelo
+  final no quedó guardada.
+- **Prueba de las ocho frases con el modelo final (en CPU local, torch 2.14.1; no es la
+  salida de Colab):**
+
+| Frase | Emoción principal | Probabilidad |
+|---|---|---|
+| Hoy me levanté con ganas de salir a caminar | joy | 0,58 |
+| Ayer vino mi nieto y pasamos una tarde hermosa | joy | 0,99 |
+| Me siento muy solo desde que se fue mi esposa | sadness | 0,99 |
+| No tengo ganas de hablar con nadie | others | 0,99 |
+| Estoy muy nervioso por el resultado de los estudios | fear | 0,93 |
+| Me da mucha bronca que no me atiendan en la obra social | anger | 0,89 |
+| El otro día me olvidé dónde dejé las llaves y me asusté | fear | 0,60 |
+| Hoy fue un día como cualquier otro | others | 0,68 |
+
+- **Lectura:** las ocho emociones principales coinciden con las del modelo v2, pero con
+  probabilidades más altas (por ejemplo, 0,99 contra 0,89 en el retraimiento y 0,99 contra
+  0,84 en la frase del nieto). Una posible causa es que este modelo se entrenó sin pesos y
+  hasta la época 5, con la pérdida de validación subiendo desde la época 2; no está
+  demostrado. En cualquier caso, las probabilidades no deben tratarse como calibradas.
+- **Decisión sobre el criterio (2026-10-09):** no se enmienda. La tesis informa el
+  resultado tal cual (F1 macro 0,5281, F1 ponderado 0,6953, accuracy 0,7005) y declara el
+  objetivo como parcialmente cumplido, con el F1 ponderado agregado como métrica
+  complementaria por la razón externa del hallazgo 3.
+- **Evidencia:** `results/final/` y `results/runs_log.csv`.
+
+### 4.11 Pendiente
+Comprobar en Colab, con el modelo final guardado en Drive y sin volver a entrenar, que las
+ocho frases dan lo mismo que en CPU local, y actualizar los valores esperados de
+`check_model.py`.
 
 ## 5. Hallazgos
 
@@ -225,8 +267,7 @@ Prueba cualitativa de las ocho frases con el modelo final, copia del modelo fina
    cinco sistemas listados, el recall coincide exactamente con el accuracy, algo que solo
    ocurre con el promedio ponderado por soporte. El criterio de la tesis (F1 macro ≥ 0,70)
    se construyó sobre esa cifra. Con el modelo final (corrida del 2026-10-09) la F1 macro
-   es 0,528 y la ponderada 0,695: ninguna alcanza 0,70. Acción pendiente: consultar con el
-   tutor y reportar siempre ambas.
+   es 0,528 y la ponderada 0,695: ninguna alcanza 0,70. Se reportan siempre ambas.
 4. **Las clases minoritarias limitan la F1 macro.** `fear`, `disgust` y `surprise` tienen
    pocos ejemplos; `disgust` casi no se predice.
 5. **Brecha de dominio.** El corpus son tuits de abril de 2019 sobre eventos; ADEPT
@@ -243,7 +284,7 @@ Prueba cualitativa de las ocho frases con el modelo final, copia del modelo fina
 | Test evaluado una sola vez, en la corrida final | Metodología de la tesis | 2026-10-05 | Notebook v3 |
 | Variantes elegidas solo con desarrollo y por promedio de semillas | Evitar ajustar sobre el test | 2026-10-05 | Sección 2 |
 | Configuración base para la corrida final | Regla de selección fijada de antemano: diferencia de F1 macro menor a 0,01 | 2026-10-09 | Entradas 4.8 y 4.9 |
-| Informar el resultado final sin cambiar configuración ni criterio a la vista del test | Evitar ajustar sobre el test | 2026-10-09 | Entrada 4.9 |
+| Informar el resultado final sin cambiar configuración ni criterio a la vista del test | Evitar ajustar sobre el test | 2026-10-09 | Entradas 4.9 y 4.10 |
 
 ## 7. Errores cometidos y corregidos
 
