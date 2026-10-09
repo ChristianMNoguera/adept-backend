@@ -6,7 +6,7 @@ como una entrada nueva, con su fecha real y su evidencia. Las entradas ya escrit
 reescriben: si algo se corrige, se agrega una entrada que lo explica.
 
 - **Última actualización:** 2026-10-09
-- **Ejecución de los entrenamientos:** Christian Noguera (Google Colab, GPU T4)
+- **Ejecución de los entrenamientos:** Google Colab, GPU T4
 - **Estado:** corrida final completada (2026-10-09); criterio de aceptación (F1 macro ≥ 0,70) no alcanzado; la tesis lo informa tal cual (decisión del equipo, entrada 4.10)
 - **Convención de fechas:** las horas son UTC y salen de los archivos que generó cada
   corrida (`metrics.json`, `runs_log.csv`). En Buenos Aires son 3 horas menos.
@@ -256,6 +256,21 @@ configuraciones es menor a 0,01, se mantiene la configuración base (la de la te
 Comprobar en Colab, con el modelo final guardado en Drive y sin volver a entrenar, que las
 ocho frases dan lo mismo que en CPU local, y actualizar los valores esperados de
 `check_model.py`.
+
+### 4.12 Paridad con Colab del modelo final (2026-10-09)
+- **Hecho:** se cargó el modelo final guardado en Drive en un cuaderno aparte de Colab (sin
+  reentrenar ni tocar el test) y se corrieron las ocho frases. Entorno de esta
+  comprobación: CPU, torch 2.11.0, transformers 5.18.0, emoji 2.16.0. Nota: no es el
+  entorno del entrenamiento (GPU, transformers 4.57.6) ni el de `ml-service`
+  (transformers 4.57.6, torch 2.14.1).
+- **Resultado:** las ocho emociones principales y sus probabilidades coinciden a dos
+  decimales con la tabla de la corrida local de `ml-service` (entrada 4.10).
+- **Lectura:** el modelo guardado da las mismas salidas en dos entornos distintos
+  (versiones de transformers y de torch diferentes), lo que respalda que el servicio
+  reproduce el comportamiento del modelo entrenado. Resuelve el pendiente de 4.11.
+- **Alcance:** son ocho frases, no una medición; no se comparó contra GPU.
+- **Decisión:** los valores de esta tabla pasan a ser la referencia de `check_model.py`.
+- **Evidencia:** salida de la celda de Colab (no se guardó en el repositorio).
 
 ## 5. Hallazgos
 
