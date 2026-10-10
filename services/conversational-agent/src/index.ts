@@ -4,17 +4,21 @@
 import "dotenv/config";
 
 import { createApp } from "./app";
-import { DATA_SOURCE } from "./config/dataSource";
+import { getDataSource } from "./config/dataSource";
 import { getAuthMode } from "./config/auth";
+import { describeRealOperations } from "./config/operations";
 
 const PORT = Number(process.env.PORT) || 3000;
 
 // Si falta configuración (por ejemplo variables de Cognito), se muestra el mensaje y se sale.
 try {
-  createApp().listen(PORT, () => {
+  const app = createApp();
+  const dataSource = getDataSource();
+  app.listen(PORT, () => {
     console.log(
-      `conversational-agent escuchando en http://localhost:${PORT} (DATA_SOURCE=${DATA_SOURCE}, AUTH_MODE=${getAuthMode()})`
+      `conversational-agent escuchando en http://localhost:${PORT} (DATA_SOURCE=${dataSource}, AUTH_MODE=${getAuthMode()})`
     );
+    if (dataSource !== "mock") console.log(describeRealOperations());
   });
 } catch (err) {
   console.error(`No se pudo iniciar: ${(err as Error).message}`);
