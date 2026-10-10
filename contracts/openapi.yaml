@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ADEPT API
-  version: "0.3.0"
+  version: "0.3.1"
   description: |
     API del backend de ADEPT: sistema conversacional de estimulación cognitiva
     para adultos mayores (app mobile) con panel de seguimiento para
@@ -112,6 +112,17 @@ paths:
                   acceptedAt: "2026-10-05T14:30:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: El usuario está autenticado pero su perfil todavía no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: profile_not_found
+                message: El perfil todavía no existe
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       tags: [Me]
       summary: Eliminar la cuenta del usuario (CU07)
@@ -160,11 +171,16 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /me/consent:
     get:
       tags: [Me]
       summary: Estado actual del consentimiento
+      description: >
+        Si el paciente todavía no respondió, devuelve `accepted: false` con la versión
+        vigente y `acceptedAt: null`.
       x-required-role: patient
       responses:
         '200':
@@ -181,9 +197,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       tags: [Me]
       summary: Aceptar o revocar el consentimiento
+      description: >
+        La versión enviada tiene que ser la vigente (`GET /consent/terms`); si no,
+        responde 400 con `error: invalid_consent_version`.
       x-required-role: patient
       requestBody:
         required: true
@@ -196,7 +217,22 @@ paths:
               version: "1.0"
       responses:
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: El request no cumple el contrato, o la versión del consentimiento no es la vigente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidRequest:
+                  summary: Campo faltante, tipo o formato inválido
+                  value:
+                    error: bad_request
+                    message: "/body must have required property 'text'"
+                invalidConsentVersion:
+                  summary: La versión no es la vigente
+                  value:
+                    error: invalid_consent_version
+                    message: La versión del consentimiento no es la vigente
         '200':
           description: Consentimiento actualizado
           content:
@@ -211,6 +247,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /me/professionals:
     get:
@@ -402,6 +440,8 @@ paths:
                   value:
                     error: forbidden
                     message: No tenés permiso para esta operación
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /sessions/{sessionId}/messages:
     post:
@@ -440,6 +480,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SessionClosed'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
 
   /sessions/{sessionId}/exercises/{exerciseId}/responses:
     post:
@@ -481,12 +525,21 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SessionClosed'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
 
   /sessions/{sessionId}/close:
     post:
       tags: [Sessions]
       summary: Cerrar una sesión activa
-      description: Al cerrar, la sesión se encola para su procesamiento posterior (NLP/ML), de forma independiente de la conversación.
+      description: >
+        Al cerrar, la sesión se encola para su procesamiento posterior (NLP/ML), de forma
+        independiente de la conversación. Es idempotente: cerrar una sesión que ya estaba
+        cerrada devuelve el mismo resumen, sin modificar nada. Si la sesión no existe o
+        pertenece a otro usuario, responde 404. `messageCount` cuenta los mensajes de ambos
+        lados: las intervenciones del usuario más las respuestas del agente, incluido el saludo.
       x-required-role: patient
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -512,6 +565,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /professional/invitations:
     post:
@@ -1005,6 +1060,33 @@ components:
           example:
             error: not_found
             message: Recurso no encontrado
+    SessionClosed:
+      description: La sesión ya está cerrada y no admite más mensajes ni respuestas a ejercicios
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: session_closed
+            message: La sesión ya está cerrada
+    LlmUnavailable:
+      description: El servicio que genera las respuestas del agente no está disponible por ahora
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: llm_unavailable
+            message: El asistente no está disponible en este momento. Probá de nuevo en unos minutos
+    InternalError:
+      description: Error inesperado del servidor (el texto de la conversación nunca se incluye)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: internal_error
+            message: Ocurrió un error inesperado
 
   schemas:
     Error:
@@ -1126,6 +1208,8 @@ components:
       properties:
         text:
           type: string
+          minLength: 1
+          maxLength: 1000
         inputType:
           type: string
           enum: [text, voice]
@@ -1168,6 +1252,8 @@ components:
       properties:
         response:
           type: string
+          minLength: 1
+          maxLength: 500
 
     ExerciseResponseResult:
       type: object
@@ -1203,6 +1289,7 @@ components:
           properties:
             messageCount:
               type: integer
+              description: Mensajes de ambos lados (intervenciones del usuario más respuestas del agente, incluido el saludo)
             exercisesCompleted:
               type: integer
             durationSeconds:

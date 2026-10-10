@@ -2,6 +2,20 @@
 
 Para el frontend: qué cambió entre versiones de la API.
 
+## 0.3.1
+
+### Cambios aditivos (no rompen clientes existentes)
+
+1. **Nuevos códigos de error en `POST /sessions/{sessionId}/messages` y `POST /sessions/{sessionId}/exercises/{exerciseId}/responses`:** `409` (`error: session_closed`, la sesión ya está cerrada) y `503` (`error: llm_unavailable`, el servicio que genera las respuestas no está disponible). Ambos con ejemplo.
+2. **`GET /me`:** nuevo `404` (`error: profile_not_found`) cuando el usuario está autenticado pero su perfil todavía no existe.
+3. **`PUT /me/consent`:** el `400` ahora tiene dos ejemplos; el nuevo es `error: invalid_consent_version` (la versión enviada no es la vigente). El código y el esquema del `400` no cambian.
+4. **`500` (`error: internal_error`)** declarado en las operaciones que ya tienen lógica real: `GET /me`, `GET /consent/terms`, `GET /me/consent`, `PUT /me/consent`, `POST /sessions` y `POST /sessions/{sessionId}/close`.
+5. **Aclaraciones de texto, sin cambio de comportamiento:** `POST /sessions/{sessionId}/close` es idempotente (cerrar una sesión ya cerrada devuelve el mismo resumen; si no existe o es de otro usuario, `404`) y `messageCount` cuenta los mensajes de ambos lados, incluido el saludo. `GET /me/consent` sin respuesta previa devuelve `accepted: false`.
+
+### Cambio restrictivo (puede romper clientes)
+
+6. **Largo de los textos:** `SendMessageRequest.text` ahora exige entre 1 y 1000 caracteres, y `ExerciseResponseRequest.response` entre 1 y 500. Un cliente que envíe un texto vacío o más largo recibe `400`.
+
 ## 0.3.0
 
 ### Cambios incompatibles (cambian formas de respuesta; el frontend tiene que adaptarse)
