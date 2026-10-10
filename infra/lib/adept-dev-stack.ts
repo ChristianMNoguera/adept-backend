@@ -1,10 +1,11 @@
-// Stack de desarrollo de ADEPT: Cognito + Lambda con la API (datos todavía mock) + API Gateway.
+// Stack de desarrollo de ADEPT: Cognito + DynamoDB + Lambda con la API (modo híbrido) + API Gateway.
 // Todo se borra con "cdk destroy" y no hay recursos que cobren por hora.
 
 import * as path from "path";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
@@ -24,10 +25,50 @@ export class AdeptDevStack extends cdk.Stack {
       });
 
     // ---------------------------------------------------------------
+    // DynamoDB (ADR-0014). Pago por uso, cifrado en reposo por defecto, sin recuperación a un
+    // punto en el tiempo, y se borran con "cdk destroy".
+    // ---------------------------------------------------------------
+
+    // Usuarios, consentimiento y metadatos de sesiones.
+    const coreTable = new dynamodb.Table(this, "CoreTable", {
+      tableName: "adept-dev-core",
+      partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    // gsi1: sesiones de un usuario ordenadas por fecha de inicio.
+    coreTable.addGlobalSecondaryIndex({
+      indexName: "gsi1",
+      partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // gsi2: sesiones activas ordenadas por última actividad. Es un índice disperso: solo tiene
+    // ítems mientras la sesión está activa (al cerrarla se le quitan gsi2pk y gsi2sk).
+    coreTable.addGlobalSecondaryIndex({
+      indexName: "gsi2",
+      partitionKey: { name: "gsi2pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Texto de los mensajes: temporal. DynamoDB borra los ítems cuando vence "expiresAt" (TTL).
+    const textTable = new dynamodb.Table(this, "TextTable", {
+      tableName: "adept-dev-text",
+      partitionKey: { name: "sessionId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "seq", type: dynamodb.AttributeType.NUMBER },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      timeToLiveAttribute: "expiresAt",
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // ---------------------------------------------------------------
     // Cognito
     // ---------------------------------------------------------------
 
-    // Lambda que asigna el grupo (patients / professionals) al confirmar el registro.
+    // Lambda que, al confirmar el registro, asigna el grupo (patients / professionals)
+    // y guarda el perfil del usuario en CoreTable.
     const postConfirmationFn = new NodejsFunction(this, "PostConfirmationFn", {
       entry: path.join(__dirname, "../lambda/post-confirmation/index.ts"),
       handler: "handler",
@@ -35,6 +76,7 @@ export class AdeptDevStack extends cdk.Stack {
       memorySize: 128,
       timeout: cdk.Duration.seconds(10),
       logGroup: logGroup("PostConfirmationLogs"),
+      environment: { CORE_TABLE: coreTable.tableName },
     });
 
     const userPool = new cognito.UserPool(this, "UserPool", {
@@ -69,6 +111,14 @@ export class AdeptDevStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ["cognito-idp:AdminAddUserToGroup"],
         resources: [this.formatArn({ service: "cognito-idp", resource: "userpool", resourceName: "*" })],
+      })
+    );
+
+    // Permiso mínimo para guardar el perfil: solo PutItem y solo sobre CoreTable.
+    postConfirmationFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [coreTable.tableArn],
       })
     );
 
@@ -124,7 +174,10 @@ export class AdeptDevStack extends cdk.Stack {
       logGroup: logGroup("ApiLogs"),
       environment: {
         AUTH_MODE: "cognito",
-        DATA_SOURCE: "mock",
+        // hybrid: las operaciones con lógica real usan DynamoDB y el resto sigue en mock (ADR-0014).
+        DATA_SOURCE: "hybrid",
+        CORE_TABLE: coreTable.tableName,
+        TEXT_TABLE: textTable.tableName,
         USER_POOL_ID: userPool.userPoolId,
         // Clientes móvil y web, más el de pruebas (adept-dev-test): se incluye solo en el stack de
         // desarrollo porque los tokens de prueba (scripts/test-users.mjs) salen de ese cliente.
@@ -151,6 +204,27 @@ export class AdeptDevStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, "../package-lock.json"),
     });
 
+    // Permisos mínimos y explícitos de la API sobre las tablas y los índices de CoreTable.
+    // Sin Scan, y sin "grantReadWriteData" (que daría más acciones de las necesarias).
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:BatchWriteItem",
+        ],
+        resources: [
+          coreTable.tableArn,
+          `${coreTable.tableArn}/index/gsi1`,
+          `${coreTable.tableArn}/index/gsi2`,
+          textTable.tableArn,
+        ],
+      })
+    );
+
     // Todo el tráfico va a la Lambda. CORS no se configura acá: lo resuelve la app Express.
     const httpApi = new apigw.HttpApi(this, "HttpApi", {
       apiName: "adept-dev",
@@ -176,5 +250,7 @@ export class AdeptDevStack extends cdk.Stack {
     new cdk.CfnOutput(this, "Region", { value: this.region });
     // Solo para el script de usuarios de prueba (no va al frontend).
     new cdk.CfnOutput(this, "TestClientId", { value: testClient.userPoolClientId });
+    new cdk.CfnOutput(this, "CoreTableName", { value: coreTable.tableName });
+    new cdk.CfnOutput(this, "TextTableName", { value: textTable.tableName });
   }
 }
