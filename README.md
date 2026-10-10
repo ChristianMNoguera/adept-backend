@@ -37,8 +37,18 @@ npm run dev
 Queda escuchando en `http://localhost:3000`. Para probar: `curl http://localhost:3000/health`.
 
 Modo de datos: por defecto responde con datos mock. Para cambiarlo, copiá `.env.example`
-como `.env` y editá `DATA_SOURCE` (`mock` o `real`). Con `real`, todos los endpoints
-(salvo `GET /health`) responden `501 Not Implemented` porque la lógica real todavía no existe.
+como `.env` y editá `DATA_SOURCE` (ver la tabla de variables más abajo):
+
+- `mock` (por defecto): todas las operaciones devuelven los datos fijos del contrato.
+- `hybrid`: cada operación usa su lógica real si está implementada y el mock si no. Hoy tienen lógica
+  real `GET /me`, `GET /consent/terms`, `GET /me/consent`, `PUT /me/consent`, `POST /sessions` y
+  `POST /sessions/{sessionId}/close`. Necesita las tablas de DynamoDB (`CORE_TABLE` y `TEXT_TABLE`),
+  así que en tu máquina solo sirve con AWS configurado; en AWS es el modo del entorno desplegado.
+- `real`: solo responden las operaciones con lógica real; el resto da `501 Not Implemented`
+  (menos `GET /health`).
+
+El registro de qué operaciones son reales está en `services/conversational-agent/src/config/operations.ts`.
+Al arrancar en `hybrid` o `real`, el servicio imprime la lista de operaciones reales.
 
 ## API
 
@@ -86,12 +96,26 @@ y los datos siguen siendo fijos. Si faltan variables de Cognito, el servicio no 
 | Variable | Para qué sirve | Por defecto |
 |---|---|---|
 | `PORT` | Puerto del servidor local | `3000` |
-| `DATA_SOURCE` | `mock` (datos fijos) o `real` (todavía responde 501) | `mock` |
+| `DATA_SOURCE` | `mock` (datos fijos), `hybrid` (real si está implementado, mock si no) o `real` (501 en lo no implementado). Cualquier otro valor impide arrancar | `mock` |
 | `AUTH_MODE` | `mock` o `cognito` | `mock` |
 | `USER_POOL_ID` | Grupo de usuarios de Cognito (obligatoria con `AUTH_MODE=cognito`) | — |
 | `COGNITO_CLIENT_IDS` | IDs de los clientes de Cognito permitidos, separados por comas (obligatoria con `AUTH_MODE=cognito`) | — |
 | `CORS_ORIGINS` | Orígenes permitidos por CORS, separados por comas (`*` = cualquiera) | cualquiera, solo en modo mock |
 | `OPENAPI_SPEC_PATH` | Ruta al contrato OpenAPI | `contracts/openapi.yaml` del repo |
+| `CORE_TABLE` | Nombre de la tabla DynamoDB de usuarios, consentimiento y sesiones (obligatoria con `hybrid` o `real`) | — |
+| `TEXT_TABLE` | Nombre de la tabla DynamoDB del texto de los mensajes (obligatoria con `hybrid` o `real`) | — |
+| `TEXT_TTL_HOURS` | Horas que vive el texto de los mensajes antes de vencer | `72` |
+
+### Tablas de DynamoDB
+
+- **`adept-dev-core`** (`CORE_TABLE`): clave `pk`/`sk`. Guarda el perfil (`USER#<id>` / `PROFILE`), el
+  consentimiento (`USER#<id>` / `CONSENT`) y los metadatos de cada sesión (`SESSION#<id>` / `META`).
+  Tiene dos índices: `gsi1` (sesiones de un usuario por fecha) y `gsi2` (sesiones activas por última
+  actividad; solo tiene ítems mientras la sesión está activa). La estructura completa está documentada
+  al principio de `src/repositories/types.ts`.
+- **`adept-dev-text`** (`TEXT_TABLE`): clave `sessionId`/`seq`. Guarda el texto de los mensajes y vence solo
+  (TTL en `expiresAt`, 72 horas por defecto). El texto vive únicamente acá. Como DynamoDB puede tardar hasta
+  48 horas en borrar un ítem vencido, el código ignora los vencidos al leer.
 
 ### Pruebas
 
@@ -100,14 +124,27 @@ cd services/conversational-agent
 npm test
 ```
 
-Prueba el middleware de Cognito con un verificador falso (sin red ni credenciales de AWS).
+Corre todas las pruebas (`src/test/`) con repositorios en memoria: el middleware de Cognito con un
+verificador falso, el registro de operaciones contra el contrato, el consentimiento, abrir y cerrar
+sesiones (incluido el saludo, la numeración de mensajes y el vencimiento del texto). No necesitan red ni
+credenciales de AWS. La conexión real con DynamoDB se comprueba con el despliegue.
 
 ### Despliegue en AWS
 
 El mismo servicio se despliega como una función Lambda detrás de un API Gateway, con autenticación
-real de Cognito y datos todavía fijos (mock). La infraestructura está en [`infra/`](infra/README.md),
+real de Cognito, las dos tablas de DynamoDB y `DATA_SOURCE=hybrid` (las operaciones con lógica real
+usan DynamoDB; el resto sigue con datos fijos). La infraestructura está en [`infra/`](infra/README.md),
 que explica paso a paso, para Windows PowerShell, cómo desplegarla, crear usuarios de prueba, correr
 `npm run smoke` contra la URL real y borrar todo.
+
+Pasos resumidos (los comandos exactos están en `infra/README.md`):
+
+1. `npx cdk diff` y `npx cdk deploy` en `infra/` (crea las tablas y actualiza las Lambdas).
+2. Con `USER_POOL_ID`, `TEST_CLIENT_ID`, `TEST_USER_PASSWORD` y `CORE_TABLE` definidas:
+   `node scripts\test-users.mjs create` (crea los usuarios de prueba y sus perfiles) y luego `tokens`.
+3. `npm run smoke` contra la `ApiUrl`: tiene que dar 25/25.
+4. Comprobar en DynamoDB que la tabla `core` tiene los perfiles y que la tabla `text` tiene el saludo
+   con `expiresAt`.
 
 ### CORS
 
@@ -172,7 +209,8 @@ accuracy 0,7005, F1 macro 0,5281 y F1 ponderado 0,6953.
 
 Todo esto se va a ir agregando en etapas siguientes, de a una por vez:
 
-- Conexión a base de datos.
+- Base de datos completa: hoy DynamoDB guarda usuarios, consentimiento y sesiones; faltan los vínculos,
+  la privacidad, las métricas y el resto de las operaciones (siguen con datos fijos).
 - Llamadas a un LLM externo.
 - Clasificador de emociones expuesto por la API (el modelo ya se entrena y se verifica, pero ningún endpoint lo usa).
 - Motor de recomendación de ejercicios.

@@ -3,8 +3,9 @@
 Infraestructura como código con **AWS CDK en TypeScript**. Un solo stack, `AdeptDevStack`, en la región `sa-east-1` (São Paulo). Crea:
 
 - **Cognito**: grupo de usuarios (registro por correo), grupos `patients` y `professionals`, y tres clientes: `adept-mobile`, `adept-web` y `adept-dev-test` (este último solo para pruebas).
-- **Lambda** con la API de `services/conversational-agent` (con datos todavía fijos/mock) detrás de un **API Gateway tipo HTTP**.
-- Una **Lambda** chica que, al confirmar el registro de un usuario, lo agrega al grupo que eligió (paciente o profesional).
+- **Dos tablas de DynamoDB** (pago por uso, se borran con el stack): `adept-dev-core` (usuarios, consentimiento y sesiones) y `adept-dev-text` (texto de los mensajes, que vence solo a las 72 horas).
+- **Lambda** con la API de `services/conversational-agent` en modo `hybrid` (las operaciones con lógica real usan DynamoDB; el resto sigue con datos fijos) detrás de un **API Gateway tipo HTTP**.
+- Una **Lambda** chica que, al confirmar el registro de un usuario, lo agrega al grupo que eligió (paciente o profesional) y guarda su perfil en `adept-dev-core`.
 
 Todo se borra con `cdk destroy`. No usa VPC ni NAT Gateway ni nada que cobre por hora; el API Gateway tiene un límite de 20 solicitudes por segundo (ráfaga de 40) para proteger el costo.
 
@@ -73,6 +74,8 @@ aws cloudformation describe-stacks --stack-name AdeptDevStack --region sa-east-1
 | `WebClientId` | Cliente de Cognito del panel web |
 | `Region` | `sa-east-1` |
 | `TestClientId` | Cliente solo para pruebas (no va al frontend) |
+| `CoreTableName` | Tabla de usuarios, consentimiento y sesiones (`adept-dev-core`) |
+| `TextTableName` | Tabla del texto de los mensajes (`adept-dev-text`) |
 
 Ninguna de estas salidas es secreta, pero tampoco las subas a archivos del repo si no hace falta.
 
@@ -84,11 +87,12 @@ Crea un paciente (`paciente.prueba@example.com`) y un profesional (`profesional.
 $env:USER_POOL_ID = "<salida UserPoolId>"
 $env:TEST_CLIENT_ID = "<salida TestClientId>"
 $env:TEST_USER_PASSWORD = Read-Host "Contraseña de prueba"
+$env:CORE_TABLE = "<salida CoreTableName>"
 node scripts\test-users.mjs create
 node scripts\test-users.mjs tokens
 ```
 
-- `create` crea los dos usuarios y los agrega a su grupo. Si ya existen, solo les actualiza la contraseña. Espera `Creado: ...` y `grupo: ...`.
+- `create` crea los dos usuarios, los agrega a su grupo y guarda su perfil en `adept-dev-core` (los usuarios creados por un administrador no pasan por la Lambda de post-confirmación). No toca el consentimiento. Si ya existen, solo actualiza la contraseña y no pisa el perfil. Espera `Creado: ...`, `grupo: ...` y `perfil: guardado`.
 - `tokens` imprime, **solo por pantalla**, una línea `$env:AUTH_TOKEN_PATIENT = "..."` y otra `$env:AUTH_TOKEN_PROFESSIONAL = "..."`. Copialas y pegalas en PowerShell. Los tokens duran 1 hora; después hay que pedirlos de nuevo.
 
 ## 7. Probar la API desplegada
@@ -103,6 +107,13 @@ npm run smoke
 
 Recorre las 25 operaciones del contrato contra la URL real, con tokens de Cognito en vez de los headers de prueba. Espera `25/25 operaciones ok`.
 
+### Comprobar los datos en DynamoDB
+
+En la consola de AWS (región `sa-east-1`), *DynamoDB → Tablas → Explorar elementos*:
+
+- `adept-dev-core` tiene un perfil por cada usuario de prueba (`pk = USER#<id>`, `sk = PROFILE`) y, después del smoke, el consentimiento (`CONSENT`) y las sesiones (`SESSION#<id>` / `META`).
+- `adept-dev-text` tiene el saludo de cada sesión con su `expiresAt` (72 horas después de la creación).
+
 ## 8. Borrar todo
 
 ```powershell
@@ -110,7 +121,7 @@ cd ..\..\infra
 npx cdk destroy
 ```
 
-Borra el stack completo (Cognito con sus usuarios, las Lambdas, la API y los logs). Pide confirmación: respondé `y`. El bucket y los roles de `cdk bootstrap` quedan en la cuenta (cuestan centavos o nada y se reutilizan).
+Borra el stack completo (Cognito con sus usuarios, las tablas de DynamoDB con sus datos, las Lambdas, la API y los logs). Pide confirmación: respondé `y`. El bucket y los roles de `cdk bootstrap` quedan en la cuenta (cuestan centavos o nada y se reutilizan).
 
 ## Configuración opcional
 

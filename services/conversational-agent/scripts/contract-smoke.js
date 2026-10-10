@@ -33,6 +33,9 @@ async function main() {
   const spec = yaml.load(fs.readFileSync(SPEC_PATH, "utf8"));
   let failures = 0;
   let total = 0;
+  // Id de la sesión que devolvió POST /sessions en esta corrida: los pasos siguientes que
+  // llevan {sessionId} lo usan (en modo mock el valor coincide con el del ejemplo).
+  let sessionId = null;
 
   for (const [route, pathItem] of Object.entries(spec.paths)) {
     for (const method of METHODS) {
@@ -40,9 +43,10 @@ async function main() {
       if (!operation) continue;
       total++;
 
-      // Cada {parametro} de la ruta se reemplaza por x_1.
-      // A eso se le suman los parámetros de query requeridos (ver queryRequerida).
-      const url = BASE_URL + route.replace(/\{[^}]+\}/g, "x_1") + queryRequerida(spec, operation);
+      // Cada {parametro} de la ruta se reemplaza por x_1 (menos {sessionId}, que usa el id real
+      // devuelto por POST /sessions). A eso se le suman los parámetros de query requeridos.
+      const ruta = route.replace(/\{([^}]+)\}/g, (_, nombre) => (nombre === "sessionId" && sessionId ? sessionId : "x_1"));
+      const url = BASE_URL + ruta + queryRequerida(spec, operation);
 
       // Rol que pide la operación (si es "any" o "none", se usa patient).
       const required = operation["x-required-role"];
@@ -67,6 +71,8 @@ async function main() {
         });
         if (String(res.status) === expected) {
           console.log(`ok   ${label} -> ${res.status}`);
+          // Guarda el id de la sesión creada para los pasos que vienen después.
+          if (method === "post" && route === "/sessions") sessionId = (await res.json()).sessionId;
         } else {
           failures++;
           console.log(`FAIL ${label} -> ${res.status} (esperado ${expected}) ${await res.text()}`);
