@@ -34,6 +34,7 @@ trazable, en vez de perderse cada vez que algo se actualiza.
 | [0011](0011-transporte-rest-y-cierre-de-sesion.md) | Transporte REST y procesamiento por lotes al cerrar la sesión | Aceptada | 2026-10-04 |
 | [0012](0012-clasificador-emocional.md) | Clasificador emocional (BETO sobre EmoEvent_es) | Aceptada | 2026-10-04 |
 | [0013](0013-despliegue-inicial-aws-y-costos.md) | Despliegue inicial en AWS y control de costos | Aceptada | 2026-10-06 |
+| [0014](0014-persistencia-y-modo-hibrido.md) | Persistencia en DynamoDB, vencimiento del texto y modo híbrido | Propuesta | 2026-10-10 |
 
 ## Cómo se suma un ADR nuevo
 
