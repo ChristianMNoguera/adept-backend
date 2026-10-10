@@ -2,13 +2,15 @@
 // Usa las credenciales del perfil de AWS configurado en tu máquina.
 //
 // Uso (desde la carpeta infra/):
-//   node scripts/test-users.mjs create   -> crea un paciente y un profesional de prueba
+//   node scripts/test-users.mjs create   -> crea un paciente y un profesional de prueba (con su perfil
+//                                           en CoreTable; el consentimiento no se toca)
 //   node scripts/test-users.mjs tokens   -> imprime un token de acceso de cada uno (solo por pantalla)
 //
 // Variables de entorno necesarias:
 //   USER_POOL_ID         (salida UserPoolId de la infraestructura)
 //   TEST_CLIENT_ID       (salida TestClientId: el cliente "adept-dev-test")
 //   TEST_USER_PASSWORD   (contraseña de los usuarios de prueba; mínimo 8 caracteres, con minúsculas y números)
+//   CORE_TABLE           (solo para "create": salida CoreTableName, la tabla donde se guardan los perfiles)
 //   AWS_REGION           (opcional, por defecto sa-east-1)
 
 import {
@@ -16,8 +18,10 @@ import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   AdminAddUserToGroupCommand,
+  AdminGetUserCommand,
   AdminInitiateAuthCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 
 // Usuarios ficticios (correos de ejemplo).
 const USUARIOS = [
@@ -35,10 +39,42 @@ function requerida(nombre) {
   return valor;
 }
 
-const client = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || "sa-east-1" });
+const region = process.env.AWS_REGION || "sa-east-1";
+const client = new CognitoIdentityProviderClient({ region });
+const dynamo = new DynamoDBClient({ region });
+
+// Guarda el perfil en CoreTable, igual que la Lambda de post-confirmación (los usuarios creados
+// por un administrador no pasan por ella). No pisa un perfil que ya existe.
+async function guardarPerfil(userPoolId, coreTable, { email, role }) {
+  // El userId es el "sub" de Cognito (el mismo que viaja en el token).
+  const usuario = await client.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }));
+  const userId = usuario.UserAttributes.find((a) => a.Name === "sub").Value;
+
+  try {
+    await dynamo.send(
+      new PutItemCommand({
+        TableName: coreTable,
+        Item: {
+          pk: { S: `USER#${userId}` },
+          sk: { S: "PROFILE" },
+          userId: { S: userId },
+          role: { S: role },
+          username: { S: email.split("@")[0] },
+          email: { S: email },
+          createdAt: { S: new Date().toISOString() },
+        },
+        ConditionExpression: "attribute_not_exists(pk)",
+      })
+    );
+    console.log("  perfil: guardado");
+  } catch (err) {
+    if (err.name !== "ConditionalCheckFailedException") throw err;
+    console.log("  perfil: ya existía (no se modifica)");
+  }
+}
 
 // Crea (o actualiza) un usuario, le fija la contraseña permanente y lo agrega a su grupo.
-async function crearUsuario(userPoolId, password, { email, role, group }) {
+async function crearUsuario(userPoolId, coreTable, password, { email, role, group }) {
   try {
     await client.send(
       new AdminCreateUserCommand({
@@ -73,6 +109,8 @@ async function crearUsuario(userPoolId, password, { email, role, group }) {
     new AdminAddUserToGroupCommand({ UserPoolId: userPoolId, Username: email, GroupName: group })
   );
   console.log(`  grupo: ${group}`);
+
+  await guardarPerfil(userPoolId, coreTable, { email, role });
 }
 
 // Inicia sesión como administrador y devuelve el token de acceso.
@@ -94,7 +132,8 @@ async function main() {
   const password = requerida("TEST_USER_PASSWORD");
 
   if (comando === "create") {
-    for (const usuario of USUARIOS) await crearUsuario(userPoolId, password, usuario);
+    const coreTable = requerida("CORE_TABLE");
+    for (const usuario of USUARIOS) await crearUsuario(userPoolId, coreTable, password, usuario);
     console.log("Listo. Ahora podés pedir los tokens con: node scripts/test-users.mjs tokens");
   } else if (comando === "tokens") {
     const clientId = requerida("TEST_CLIENT_ID");

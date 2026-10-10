@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-cognito-identity-provider": "3.1146.0",
+    "@aws-sdk/client-dynamodb": "3.1146.0",
     "@types/node": "18.19.130",
     "aws-cdk": "2.1144.0",
     "esbuild": "0.28.2",
