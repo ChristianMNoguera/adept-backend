@@ -17,7 +17,7 @@ test("el texto del consentimiento no tiene marcadores pendientes ni símbolos de
 test("el texto del consentimiento tiene las 8 secciones y las listas con guion", () => {
   for (let n = 1; n <= 8; n++) assert.match(text, new RegExp(`(^|\n)${n}\. [^\n]+\n\n`), `falta el título ${n}`);
   assert.equal(text.split("\n").filter((l) => l.startsWith("- ")).length, 4);
-  assert.match(text, /Contacto: <adept@adept\.com>\.$/);
+  assert.match(text, /Contacto: adept@adept\.com\.$/);
 });
 
 test("el mock devuelve la misma versión y el mismo texto que la lógica real", () => {

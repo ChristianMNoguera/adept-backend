@@ -202,7 +202,7 @@ paths:
 
                   8. Avisos
 
-                  ADEPT no es un servicio de emergencias. Si tenés una urgencia, comunicate con los servicios de emergencia de tu zona. Si esta información cambia, te vamos a pedir que la aceptes de nuevo. Contacto: <adept@adept.com>.
+                  ADEPT no es un servicio de emergencias. Si tenés una urgencia, comunicate con los servicios de emergencia de tu zona. Si esta información cambia, te vamos a pedir que la aceptes de nuevo. Contacto: adept@adept.com.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
