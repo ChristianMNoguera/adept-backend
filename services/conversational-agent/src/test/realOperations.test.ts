@@ -6,6 +6,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { startTestApp, TestApp } from "./helpers";
 import { buildGreeting, variantePara } from "../services/greeting";
+import { currentTerms } from "../services/consent";
+
+// Versión vigente del consentimiento (sale del archivo versionado, no se repite a mano).
+const V = currentTerms().version;
 
 // Prepara una app y le da un perfil de paciente con nombre conocido.
 async function appConPaciente(now?: string): Promise<TestApp> {
@@ -21,7 +25,7 @@ async function appConPaciente(now?: string): Promise<TestApp> {
 }
 
 async function aceptarConsentimiento(app: TestApp, user = "user-1") {
-  return app.call("PUT", "/me/consent", { user, body: { accepted: true, version: "1.0" } });
+  return app.call("PUT", "/me/consent", { user, body: { accepted: true, version: V } });
 }
 
 // ---------------------------------------------------------------------------
@@ -32,7 +36,7 @@ test("consentimiento: GET /me/consent sin respuesta previa devuelve no aceptado"
   try {
     const res = await app.call("GET", "/me/consent");
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body, { accepted: false, version: "1.0", acceptedAt: null });
+    assert.deepEqual(res.body, { accepted: false, version: V, acceptedAt: null });
   } finally {
     await app.close();
   }
@@ -56,9 +60,9 @@ test("consentimiento: aceptar, versión incorrecta y revocar", async () => {
     assert.deepEqual((await app.call("GET", "/me/consent")).body, aceptado.body);
 
     // Revocar se guarda como tal.
-    const revocado = await app.call("PUT", "/me/consent", { body: { accepted: false, version: "1.0" } });
+    const revocado = await app.call("PUT", "/me/consent", { body: { accepted: false, version: V } });
     assert.equal(revocado.status, 200);
-    assert.deepEqual(revocado.body, { accepted: false, version: "1.0", acceptedAt: null });
+    assert.deepEqual(revocado.body, { accepted: false, version: V, acceptedAt: null });
     assert.equal((await app.call("GET", "/me/consent")).body.accepted, false);
   } finally {
     await app.close();
@@ -70,8 +74,9 @@ test("GET /consent/terms devuelve la versión y el texto del archivo versionado"
   try {
     const res = await app.call("GET", "/consent/terms");
     assert.equal(res.status, 200);
-    assert.equal(res.body.version, "1.0");
-    assert.match(res.body.text, /^ADEPT recopila indicadores/);
+    assert.equal(res.body.version, "1.1");
+    assert.match(res.body.text, /^Antes de empezar, queremos contarte/);
+    assert.match(res.body.text, /OpenAI/);
   } finally {
     await app.close();
   }
@@ -106,7 +111,7 @@ test("POST /sessions sin consentimiento responde 403 consent_required", async ()
 
     // Con el consentimiento revocado o en otra versión tampoco alcanza.
     await aceptarConsentimiento(app);
-    await app.call("PUT", "/me/consent", { body: { accepted: false, version: "1.0" } });
+    await app.call("PUT", "/me/consent", { body: { accepted: false, version: V } });
     assert.equal((await app.call("POST", "/sessions")).status, 403);
   } finally {
     await app.close();
