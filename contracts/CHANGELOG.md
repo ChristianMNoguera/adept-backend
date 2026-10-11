@@ -2,6 +2,14 @@
 
 Para el frontend: qué cambió entre versiones de la API.
 
+## 0.3.2
+
+### Cambio de contenido (sin cambio de forma)
+
+- **Consentimiento informado, versión `1.1`:** `GET /consent/terms` ahora devuelve la versión `1.1` y el texto completo (qué es ADEPT, qué información se recopila, cómo se usa, qué se guarda y por cuánto tiempo, el envío de mensajes a un proveedor externo, quién ve los indicadores, los derechos de la persona y los avisos). Los ejemplos de `GET /consent/terms`, `GET /me/consent`, `PUT /me/consent` (pedido y respuesta) y el campo `consent` de `GET /me` pasan de `1.0` a `1.1`.
+- **Qué tiene que hacer el frontend:** no hay campos nuevos ni cambios de esquema. Como `PUT /me/consent` solo acepta la versión vigente, quien aceptó la `1.0` tiene que volver a aceptar: la app debe mostrar el texto que devuelve `GET /consent/terms` y enviar su `version` al aceptar. Mientras no lo haga, `POST /sessions` responde `403` con `consent_required`.
+- El texto todavía tiene un dato pendiente: el correo de contacto del equipo figura como `[COMPLETAR: correo del equipo]`.
+
 ## 0.3.1
 
 ### Cambios aditivos (no rompen clientes existentes)
