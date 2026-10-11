@@ -117,6 +117,23 @@ y los datos siguen siendo fijos. Si faltan variables de Cognito, el servicio no 
   (TTL en `expiresAt`, 72 horas por defecto). El texto vive únicamente acá. Como DynamoDB puede tardar hasta
   48 horas en borrar un ítem vencido, el código ignora los vencidos al leer.
 
+### Consentimiento informado
+
+La versión y el texto vigentes están en `services/conversational-agent/src/content/consent-terms.es.json`.
+Los usan `GET /consent/terms`, `PUT /me/consent` (solo acepta la versión vigente), `POST /sessions` (exige
+el consentimiento aceptado en esa versión) y los mocks.
+
+El texto es **texto plano**: se tiene que ver bien tal cual y poder leerse en voz alta (RF08). Cada título de
+sección va en su propia línea, seguido de una línea en blanco; las secciones se separan con una línea en
+blanco; las listas llevan `- ` al inicio de cada ítem; no lleva símbolos de Markdown (`*`, `#`, comillas
+invertidas). Una prueba automática falla si aparece alguno de esos símbolos o un marcador `[COMPLETAR`.
+
+**Regla:** una vez desplegado y aceptado por alguna persona real, cualquier cambio de redacción exige una
+**versión nueva del texto** (1.2, etc.), porque la aceptación se guarda por versión. Para cambiarlo: editar
+el JSON (con la versión nueva), actualizar los ejemplos del contrato (`GET /consent/terms`, `GET /me`,
+`GET /me/consent` y `PUT /me/consent`) y anotarlo en `contracts/CHANGELOG.md`. Quien aceptó la versión
+anterior vuelve a recibir `consent_required` hasta aceptar la nueva.
+
 ### Pruebas
 
 ```bash
